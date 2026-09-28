@@ -1,0 +1,141 @@
+{% extends "_genel_duzen.html" %}
+{% import "_bilesenler.html" as ui with context %}
+{% block baslik %}ArcBase — Belgelerinizi okuyan ve düzenleyen arşiv{% endblock %}
+
+{% block icerik %}
+{# ------------------------------------------------------------ giris bolumu #}
+<section class="grid grid-cols-1 items-center gap-10 lg:grid-cols-2 lg:gap-14" aria-labelledby="tanitim-baslik">
+  <div>
+    <p class="kart-giris mb-4 inline-flex items-center gap-1.5 rounded-full bg-marka-50 px-3 py-1 text-xs font-semibold text-marka-700 ring-1 ring-inset ring-marka-600/15 dark:bg-marka-500/10 dark:text-marka-300 dark:ring-marka-400/25" style="--i: 0">
+      {{ ui.ikon('yildiz', 'w-3.5 h-3.5') }}Fotoğraftan düzenli arşive, saniyeler içinde
+    </p>
+    <h1 id="tanitim-baslik" class="kart-giris text-4xl font-extrabold leading-[1.1] tracking-tight text-metin sm:text-5xl" style="--i: 1">
+      Kâğıt belgelerinizi
+      <span class="bg-gradient-to-r from-marka-600 via-violet-600 to-gunes-500 bg-clip-text text-transparent">düzenli bir dijital arşive</span>
+      dönüştürün
+    </h1>
+    <p class="kart-giris mt-5 max-w-xl text-base leading-relaxed text-metin-2" style="--i: 2">
+      Faturanın, sözleşmenin ya da dilekçenin fotoğrafını yükleyin, gerisini biz halledelim. Belgeleriniz
+      tarayıcıdan çıkmış gibi temizlenir, türüne göre ayrılır ve aradığınızı içindeki bir kelimeyle saniyeler içinde bulursunuz.
+    </p>
+    <div class="kart-giris mt-8 flex flex-col gap-3 sm:flex-row" style="--i: 3">
+      <a href="{{ url_for('kayit') }}" class="btn btn-birincil h-12 px-6 text-base">
+        {{ ui.ikon('arti', 'w-4 h-4', '2.4') }}Ücretsiz hesap oluştur
+      </a>
+      <a href="{{ url_for('giris') }}" class="btn btn-ikincil h-12 px-6 text-base">
+        {{ ui.ikon('giris', 'w-4 h-4') }}Giriş yap
+      </a>
+    </div>
+    <p class="kart-giris mt-5 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-metin-3" style="--i: 4">
+      <span class="inline-flex items-center gap-1">{{ ui.ikon('tik', 'w-3.5 h-3.5 text-turkuaz-600', '2.6') }}JPG, PNG ve PDF</span>
+      <span class="inline-flex items-center gap-1">{{ ui.ikon('tik', 'w-3.5 h-3.5 text-turkuaz-600', '2.6') }}Hesap başına {{ belge_limiti }} belge</span>
+      <span class="inline-flex items-center gap-1">{{ ui.ikon('tik', 'w-3.5 h-3.5 text-turkuaz-600', '2.6') }}Belgeleriniz yalnızca size görünür</span>
+    </p>
+  </div>
+
+  {# Ornek belge karti: arayuzun nasil gorundugune dair temsili bir gorsel. #}
+  <div class="kart-giris relative mx-auto w-full max-w-md" style="--i: 3" aria-hidden="true">
+    <div class="absolute -inset-6 -z-10 rounded-[2.5rem] bg-gradient-to-br from-marka-500/20 via-violet-500/10 to-gunes-400/20 blur-2xl"></div>
+    <div class="rounded-3xl border border-cizgi bg-kart p-4 shadow-yukselt">
+      <div class="relative overflow-hidden rounded-2xl border border-cizgi bg-yuzey p-5">
+        <div class="mb-4 flex items-center justify-between">
+          <span class="h-3 w-24 rounded-full bg-cizgi"></span>
+          <span class="h-3 w-12 rounded-full bg-cizgi"></span>
+        </div>
+        <div class="space-y-2.5">
+          <span class="block h-2.5 w-full rounded-full bg-cizgi"></span>
+          <span class="block h-2.5 w-11/12 rounded-full bg-cizgi"></span>
+          <span class="block h-2.5 w-4/5 rounded-full bg-cizgi"></span>
+          <span class="block h-2.5 w-full rounded-full bg-cizgi"></span>
+          <span class="block h-2.5 w-2/3 rounded-full bg-cizgi"></span>
+        </div>
+        <div class="mt-5 flex items-end justify-between">
+          <span class="block h-2.5 w-20 rounded-full bg-cizgi"></span>
+          <span class="block h-6 w-24 rounded-lg bg-marka-600/15"></span>
+        </div>
+        <span class="tanitim-tarama pointer-events-none absolute inset-x-0 top-0 h-16 bg-gradient-to-b from-transparent via-turkuaz-400/25 to-transparent"></span>
+      </div>
+      <div class="flex items-center justify-between gap-3 px-1 pb-1 pt-4">
+        <div class="min-w-0">
+          <p class="truncate text-sm font-semibold text-metin">elektrik_faturasi_eylul.jpg</p>
+          <p class="text-xs text-metin-3">az önce yüklendi</p>
+        </div>
+        {{ ui.tur_rozeti('fatura') }}
+      </div>
+      <div class="px-1 pb-1 pt-3">
+        <div class="mb-1.5 flex justify-between text-xs">
+          <span class="font-semibold text-metin-3">Otomatik tanındı</span>
+          <span class="font-bold tabular-nums text-metin">%94</span>
+        </div>
+        <div class="h-2 overflow-hidden rounded-full bg-yuzey">
+          <div class="guven-dolgu h-full rounded-full bg-turkuaz-500" style="--deger: 94%"></div>
+        </div>
+      </div>
+    </div>
+    <div class="tanitim-rozet absolute -left-4 top-10 hidden sm:block" style="--i: 0">{{ ui.tur_rozeti('sozlesme', 'shadow-yukselt !bg-kart') }}</div>
+    <div class="tanitim-rozet absolute -right-3 top-1/2 hidden sm:block" style="--i: 1">{{ ui.tur_rozeti('kimlik', 'shadow-yukselt !bg-kart') }}</div>
+    <div class="tanitim-rozet absolute -bottom-4 left-10 hidden sm:block" style="--i: 2">{{ ui.tur_rozeti('resmi_yazi', 'shadow-yukselt !bg-kart') }}</div>
+  </div>
+</section>
+
+{# ------------------------------------------------------------ nasil calisir #}
+<section class="mt-20 sm:mt-24" aria-labelledby="nasil-baslik">
+  <div class="kart-giris mb-8 text-center" style="--i: 5">
+    <h2 id="nasil-baslik" class="text-2xl font-extrabold tracking-tight text-metin sm:text-3xl">Nasıl çalışır?</h2>
+    <p class="mt-2 text-sm text-metin-2">Üç adım, gerisi otomatik.</p>
+  </div>
+  <ol class="grid grid-cols-1 gap-4 sm:grid-cols-3">
+    {% set adimlar = [
+      ('gorsel', 'Fotoğrafla', 'Belgenin fotoğrafını çekin ya da PDF’ini hazırlayın.', 'ton-buz'),
+      ('yukle', 'Yükle', 'Sürükleyip bırakın; tek seferde birden fazla belge olur.', 'ton-gunes'),
+      ('arsiv', 'Düzenli arşivin hazır', 'Belgeler temizlenir, türüne göre ayrılır, kolayca bulunur.', 'ton-nane'),
+    ] %}
+    {% for ikon_adi, baslik_adi, aciklama, ton in adimlar %}
+      <li class="kart-giris relative rounded-2xl border border-cizgi bg-kart p-5 shadow-kart" style="--i: {{ loop.index0 + 6 }}">
+        <span class="absolute right-4 top-4 text-xs font-bold tabular-nums text-metin-3">0{{ loop.index }}</span>
+        <span class="renkli-ikon {{ ton }} mb-4 flex h-11 w-11 items-center justify-center rounded-xl">
+          {{ ui.ikon(ikon_adi) }}
+        </span>
+        <p class="font-semibold text-metin">{{ baslik_adi }}</p>
+        <p class="mt-1 text-sm leading-relaxed text-metin-2">{{ aciklama }}</p>
+      </li>
+    {% endfor %}
+  </ol>
+</section>
+
+{# ------------------------------------------------------------ ozellikler #}
+<section class="mt-20 sm:mt-24" aria-labelledby="ozellik-baslik">
+  <div class="kart-giris mb-8 text-center" style="--i: 10">
+    <h2 id="ozellik-baslik" class="text-2xl font-extrabold tracking-tight text-metin sm:text-3xl">Neler sunar?</h2>
+  </div>
+  <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+    {% set ozellikler = [
+      ('klasor', 'Otomatik kategoriler', 'Fatura, sözleşme, kimlik, dilekçe, resmi yazı ve diğer; her belge doğru klasöre gider.'),
+      ('ara', 'İçerikte arama', 'Dosya adında değil, belgenin içinde geçen kelimelerle arayın.'),
+      ('kalkan', 'Güvenli saklama', 'Belgeleriniz korunur; yalnızca siz erişirsiniz.'),
+      ('kilit', 'Size özel arşiv', 'Her kullanıcı yalnızca kendi belgelerini görür ve yönetir.'),
+      ('kalem', 'Kolay düzeltme', 'Emin olamadığımız belgeleri işaretleriz; türü tek tıkla düzeltin.'),
+      ('dosya-metin', 'Temiz PDF', 'Fotoğrafları taranmış gibi temiz, aranabilir PDF olarak indirin.'),
+    ] %}
+    {% set tonlar = ['ton-buz', 'ton-gunes', 'ton-nane', 'ton-pembe', 'ton-gunes', 'ton-buz'] %}
+    {% for ikon_adi, baslik_adi, aciklama in ozellikler %}
+      <div class="kart-giris flex gap-4 rounded-2xl border border-cizgi bg-kart p-5 shadow-kart" style="--i: {{ loop.index0 + 11 }}">
+        <span class="renkli-ikon {{ tonlar[loop.index0] }} flex h-10 w-10 shrink-0 items-center justify-center rounded-xl">{{ ui.ikon(ikon_adi) }}</span>
+        <div>
+          <p class="font-semibold text-metin">{{ baslik_adi }}</p>
+          <p class="mt-1 text-sm leading-relaxed text-metin-2">{{ aciklama }}</p>
+        </div>
+      </div>
+    {% endfor %}
+  </div>
+</section>
+
+{# ------------------------------------------------------------ son cagri #}
+<section class="kart-giris mt-20 overflow-hidden rounded-3xl bg-gradient-to-br from-marka-600 via-violet-600 to-violet-700 p-8 text-center text-white shadow-yukselt sm:mt-24 sm:p-12" style="--i: 12">
+  <h2 class="text-2xl font-extrabold tracking-tight sm:text-3xl">Arşivinizi bugün düzenlemeye başlayın</h2>
+  <p class="mx-auto mt-2 max-w-lg text-sm text-white/80">Kayıt olmak bir dakikadan kısa sürer. Sadece bir kullanıcı adı ve şifre yeterli.</p>
+  <a href="{{ url_for('kayit') }}" class="btn mt-6 h-12 bg-white px-6 text-base text-marka-700 shadow-lg hover:bg-marka-50">
+    {{ ui.ikon('arti', 'w-4 h-4', '2.4') }}Hesap oluştur
+  </a>
+</section>
+{% endblock %}

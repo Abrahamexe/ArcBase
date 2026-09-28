@@ -1,0 +1,24 @@
+# Gizli bilgiler imaja girmez; Render'da ortam degiskenleri panelden verilir.
+.env
+.env.*
+!.env.example
+
+.venv/
+venv/
+__pycache__/
+*.pyc
+.git/
+.gitignore
+.dockerignore
+Dockerfile
+
+# Calisma icin gerekmeyenler
+docs/
+tests/
+scratchpad/
+*.db
+plan*.md
+DEVAM.md
+.araclar/
+.pytest_cache/
+.claude/

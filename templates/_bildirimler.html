@@ -1,0 +1,33 @@
+{# Flash mesajlari; hem uygulama sayfalari (base.html) hem giris/kayit gibi
+   genel sayfalar (_genel_duzen.html) kullanir. #}
+{% import "_bilesenler.html" as ui with context %}
+{% with mesajlar = get_flashed_messages(with_categories=true) %}
+  <div class="pointer-events-none fixed inset-x-4 top-20 z-[70] flex flex-col items-end gap-2 sm:inset-x-auto sm:right-6"
+       aria-live="polite" data-bildirimler>
+    {% for tur_adi, mesaj in mesajlar %}
+      <div role="{{ 'alert' if tur_adi == 'hata' else 'status' }}" data-bildirim
+           class="bildirim {{ 'bildirim-basari' if tur_adi not in ('hata', 'uyari') else '' }} pointer-events-auto relative flex w-full max-w-sm items-start gap-3 overflow-hidden rounded-2xl border border-cizgi bg-kart p-4 pr-10 shadow-yukselt"
+           style="--i: {{ loop.index0 }}; --sure: {{ '8s' if tur_adi == 'hata' else '5s' }}">
+        {% if tur_adi == 'hata' %}
+          <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-rose-50 text-rose-600 dark:bg-rose-500/15 dark:text-rose-300">{{ ui.ikon('hata', 'w-[18px] h-[18px]') }}</span>
+        {% elif tur_adi == 'uyari' %}
+          <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-amber-50 text-amber-600 dark:bg-amber-500/15 dark:text-amber-300">{{ ui.ikon('uyari', 'w-[18px] h-[18px]') }}</span>
+        {% else %}
+          <span class="basari-ikon relative flex h-8 w-8 shrink-0 items-center justify-center rounded-full">{{ ui.ikon('tik', 'w-[18px] h-[18px]', '2.8') }}</span>
+        {% endif %}
+        <div class="min-w-0 pt-1">
+          <p class="text-sm font-semibold text-metin">
+            {{ 'Bir sorun oluştu' if tur_adi == 'hata' else ('Dikkat' if tur_adi == 'uyari' else 'Harika!') }}
+          </p>
+          <p class="mt-0.5 text-sm text-metin-2">{{ mesaj }}</p>
+        </div>
+        <button type="button" data-bildirim-kapat aria-label="Bildirimi kapat"
+                class="absolute right-2 top-2 rounded-lg p-1.5 text-metin-3 transition hover:bg-yuzey hover:text-metin">
+          {{ ui.ikon('kapat', 'w-4 h-4') }}
+        </button>
+        <span class="bildirim-sure absolute inset-x-0 bottom-0 h-0.5
+          {% if tur_adi == 'hata' %}bg-rose-500{% elif tur_adi == 'uyari' %}bg-amber-500{% else %}bildirim-sure-basari{% endif %}"></span>
+      </div>
+    {% endfor %}
+  </div>
+{% endwith %}

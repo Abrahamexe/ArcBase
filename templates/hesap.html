@@ -1,0 +1,158 @@
+{% extends "base.html" %}
+{% import "_bilesenler.html" as ui with context %}
+{% block baslik %}Hesabım — ArcBase{% endblock %}
+
+{% block icerik %}
+{% set doluluk = [(belge_sayisi / belge_limiti * 100) | round | int, 100] | min if belge_limiti else 100 %}
+{% set kota_doldu = belge_sayisi >= belge_limiti %}
+{% set kota_az = not kota_doldu and doluluk >= 80 %}
+
+<header class="kart-giris mb-6 sm:mb-8" style="--i: 0">
+  <h1 class="text-2xl font-extrabold tracking-tight text-metin sm:text-[28px]">Hesabım</h1>
+  <p class="mt-1 text-sm text-metin-2">Hesap bilgileriniz, depolama kotanız ve güvenlik ayarları.</p>
+</header>
+
+<div class="grid grid-cols-1 gap-6 lg:grid-cols-3">
+
+  {# ------------------------------------------------------------ profil ve kota #}
+  <div class="space-y-4">
+    <section class="kart-giris rounded-2xl border border-cizgi bg-kart p-5 shadow-kart sm:p-6" style="--i: 1" aria-label="Profil">
+      <div class="flex items-center gap-4">
+        <span class="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-marka-600 to-violet-600 text-xl font-bold uppercase text-white shadow-md shadow-violet-600/25"
+              aria-hidden="true">{{ current_user.kullanici_adi[:1] }}</span>
+        <div class="min-w-0">
+          <p class="truncate text-lg font-bold tracking-tight text-metin">{{ current_user.kullanici_adi }}</p>
+          <p class="text-xs text-metin-3">Üyelik: {{ ui.zaman(current_user.olusturma_tarihi, 'tam') }}</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="renkli-kart ton-buz kart-giris rounded-2xl border p-5 shadow-kart sm:p-6" style="--i: 2" aria-labelledby="kota-baslik">
+      <div class="mb-3 flex items-start justify-between">
+        <h2 id="kota-baslik" class="text-sm font-semibold text-metin-2">Belge kotası</h2>
+        <span class="renkli-ikon ton-buz flex h-10 w-10 items-center justify-center rounded-xl">
+          {{ ui.ikon('veritabani') }}
+        </span>
+      </div>
+      <p class="text-3xl font-extrabold tracking-tight text-metin">
+        <span class="sayi-gecis" data-sayac="{{ belge_sayisi }}">{{ belge_sayisi }}</span>
+        <span class="text-lg font-bold text-metin-3">/ {{ belge_limiti }} belge</span>
+      </p>
+      <div class="mt-3 h-2.5 overflow-hidden rounded-full bg-yuzey" role="meter" aria-label="Kota doluluğu"
+           aria-valuemin="0" aria-valuemax="{{ belge_limiti }}" aria-valuenow="{{ belge_sayisi }}">
+        <div class="kota-dolgu h-full rounded-full {{ 'bg-rose-500' if kota_doldu else ('bg-orange-500' if kota_az else 'bg-marka-600 dark:bg-marka-500') }}"
+             style="--deger: {{ doluluk }}%"></div>
+      </div>
+      <p class="mt-2 text-xs {{ 'font-medium text-rose-600 dark:text-rose-300' if kota_doldu else ('text-orange-600 dark:text-orange-300' if kota_az else 'text-metin-3') }}">
+        {% if kota_doldu %}
+          Kotanız doldu. Yeni belge yüklemek için eski belgelerden bazılarını silin.
+        {% elif kota_az %}
+          Kotanız dolmak üzere: {{ belge_limiti - belge_sayisi }} belge hakkınız kaldı.
+        {% else %}
+          {{ belge_limiti - belge_sayisi }} belge daha yükleyebilirsiniz.
+        {% endif %}
+      </p>
+    </section>
+  </div>
+
+  <div class="space-y-4 lg:col-span-2">
+    {# ------------------------------------------------------------ mevcut belgelerden bilgi cikarma
+       JS varken belgeler tek tek islenip ilerleme gosterilir (app.js: data-bilgi-cikar);
+       JS yokken form her basista birkac belge isler. #}
+    <section id="bilgi-cikar" class="kart-giris scroll-mt-24 rounded-2xl border border-cizgi bg-kart p-5 shadow-kart sm:p-6" style="--i: 3" aria-labelledby="bilgi-cikar-baslik">
+      <div class="mb-4 flex items-start gap-3">
+        <span class="renkli-ikon ton-pembe flex h-10 w-10 shrink-0 items-center justify-center rounded-xl">{{ ui.ikon('yildiz') }}</span>
+        <div>
+          <h2 id="bilgi-cikar-baslik" class="text-base font-bold text-metin">Mevcut belgelerden bilgi çıkar</h2>
+          <p class="mt-0.5 text-xs text-metin-3">
+            Eski belgelerinizin tarih, tutar ve kurum bilgilerini otomatik doldurur. Elle düzelttiğiniz bilgiler değişmez.
+          </p>
+        </div>
+      </div>
+      <form action="{{ url_for('bilgi_cikar') }}" method="post" data-bilgi-cikar data-toplam="{{ bilgisi_eksik }}" class="space-y-3">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <p class="text-sm text-metin-2" data-bilgi-durum aria-live="polite">
+            {% if bilgisi_eksik %}
+              <span class="font-semibold text-metin">{{ bilgisi_eksik }}</span> belgenin bilgileri henüz çıkarılmadı.
+            {% else %}
+              Tüm belgelerin bilgileri çıkarılmış.
+            {% endif %}
+          </p>
+          <button type="submit" class="btn btn-birincil w-full shrink-0 sm:w-auto" {% if not bilgisi_eksik %}disabled{% endif %}>
+            {{ ui.ikon('yildiz', 'w-4 h-4') }}Bilgi çıkar
+          </button>
+        </div>
+        <div class="h-2 overflow-hidden rounded-full bg-yuzey" hidden data-bilgi-cubuk
+             role="progressbar" aria-label="Bilgi çıkarma ilerlemesi" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+          <div class="ilerleme-dolgu h-full rounded-full" style="width: 0%" data-bilgi-dolgu></div>
+        </div>
+      </form>
+    </section>
+
+    {# ------------------------------------------------------------ guvenlik #}
+    <section class="kart-giris rounded-2xl border border-cizgi bg-kart p-5 shadow-kart sm:p-6" style="--i: 4" aria-labelledby="sifre-baslik">
+      <div class="mb-5 flex items-start gap-3">
+        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-yuzey text-metin-2">{{ ui.ikon('kilit') }}</span>
+        <div>
+          <h2 id="sifre-baslik" class="text-base font-bold text-metin">Şifre değiştir</h2>
+          <p class="mt-0.5 text-xs text-metin-3">Şifre değişince diğer cihazlardaki oturumlarınız kapanır.</p>
+        </div>
+      </div>
+      <form action="{{ url_for('sifre_degistir') }}" method="post" class="space-y-4" data-kimlik-formu>
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        {# Tarayicinin sifre yoneticisi hangi hesap icin oldugunu bilsin diye #}
+        <input type="text" name="kullanici_adi" value="{{ current_user.kullanici_adi }}" autocomplete="username" hidden>
+        {{ ui.form_alani('mevcut_sifre', 'Mevcut şifre', tur='password', otomatik='current-password', ekstra='required') }}
+        <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          {{ ui.form_alani('yeni_sifre', 'Yeni şifre', tur='password', otomatik='new-password', ipucu='En az 8 karakter.',
+                           ekstra='required minlength="8" maxlength="128"') }}
+          {{ ui.form_alani('yeni_sifre_tekrar', 'Yeni şifre (tekrar)', tur='password', otomatik='new-password',
+                           ekstra='required minlength="8" maxlength="128"') }}
+        </div>
+        <div class="flex justify-end">
+          <button type="submit" class="btn btn-birincil w-full sm:w-auto" data-mesgul-sifirla>
+            {{ ui.ikon('tik', 'w-4 h-4', '2.4') }}Şifreyi güncelle
+          </button>
+        </div>
+      </form>
+    </section>
+
+    <section class="kart-giris rounded-2xl border border-rose-200 bg-kart p-5 shadow-kart dark:border-rose-500/25 sm:p-6" style="--i: 5" aria-labelledby="silme-baslik">
+      <div class="mb-5 flex items-start gap-3">
+        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-rose-50 text-rose-600 dark:bg-rose-500/15 dark:text-rose-300">{{ ui.ikon('sil') }}</span>
+        <div>
+          <h2 id="silme-baslik" class="text-base font-bold text-metin">Hesabı sil</h2>
+          <p class="mt-0.5 text-xs text-metin-2">
+            Hesabınız ve <span class="font-semibold text-metin">{{ belge_sayisi }} belgenizin tamamı</span> kalıcı olarak silinir. Bu işlem geri alınamaz.
+          </p>
+        </div>
+      </div>
+      <form action="{{ url_for('hesap_sil') }}" method="post" class="flex flex-col gap-3 sm:flex-row sm:items-end" data-onay>
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <div class="flex-1">
+          {{ ui.form_alani('sifre', 'Onay için şifreniz', tur='password', otomatik='current-password', ekstra='required') }}
+        </div>
+        <button type="submit" class="btn btn-tehlike h-11">{{ ui.ikon('sil', 'w-4 h-4') }}Hesabımı sil</button>
+      </form>
+    </section>
+  </div>
+</div>
+{% endblock %}
+
+{% block pencereler %}
+{# app.js'teki silme onayi (form[data-onay]) bu pencereyi kullanir. #}
+<dialog id="sil-penceresi" class="pencere" aria-labelledby="sil-baslik">
+  <div class="w-[min(92vw,420px)] rounded-3xl border border-cizgi bg-kart p-6 shadow-yukselt">
+    <span class="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-rose-50 text-rose-600 dark:bg-rose-500/15 dark:text-rose-300">{{ ui.ikon('uyari', 'w-6 h-6') }}</span>
+    <h2 id="sil-baslik" class="text-lg font-bold tracking-tight text-metin">Hesabınız silinsin mi?</h2>
+    <p class="mt-1.5 text-sm text-metin-2">
+      <span class="font-semibold text-metin">{{ current_user.kullanici_adi }}</span> hesabı ve tüm belgeleri kalıcı olarak silinecek. Bu işlem geri alınamaz.
+    </p>
+    <div class="mt-6 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+      <button type="button" class="btn btn-ikincil" data-pencere-kapat autofocus>Vazgeç</button>
+      <button type="button" class="btn btn-dolu-tehlike" data-onayla data-mesgul-sifirla>{{ ui.ikon('sil', 'w-4 h-4') }}Evet, hesabımı sil</button>
+    </div>
+  </div>
+</dialog>
+{% endblock %}

@@ -1,0 +1,4 @@
+/* Tailwind derleme girdisi (bkz. tailwind.config.js). Cikti: static/tailwind.css */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;

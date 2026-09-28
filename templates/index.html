@@ -1,0 +1,138 @@
+{% extends "base.html" %}
+{% import "_bilesenler.html" as ui with context %}
+{% block baslik %}Panel — ArcBase{% endblock %}
+
+{% block icerik %}
+{% set toplam = tur_sayilari.values() | sum(attribute='adet') %}
+{% set dolu_kategori = tur_sayilari.values() | selectattr('adet') | list | length %}
+{% set en_cok = [tur_sayilari.values() | map(attribute='adet') | max, 1] | max %}
+
+<header class="kart-giris mb-6 sm:mb-8" style="--i: 0">
+  <h1 class="text-2xl font-extrabold tracking-tight text-metin sm:text-[28px]">Panel</h1>
+  <p class="mt-1 text-sm text-metin-2">Arşivinizin genel görünümü, hızlı yükleme ve son eklenen belgeler.</p>
+</header>
+
+{# ------------------------------------------------------------ istatistikler #}
+<section aria-label="Özet" class="grid grid-cols-1 gap-4 lg:grid-cols-3">
+  <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-1">
+
+    <div class="renkli-kart ton-buz kart-giris rounded-2xl border p-5 shadow-kart" style="--i: 1">
+      <div class="flex items-start justify-between">
+        <p class="text-sm font-semibold text-metin-2">Toplam belge</p>
+        <span class="renkli-ikon ton-buz flex h-10 w-10 items-center justify-center rounded-xl">
+          {{ ui.ikon('arsiv') }}
+        </span>
+      </div>
+      <p class="sayi-gecis mt-1 text-4xl font-extrabold tracking-tight text-metin" data-sayac="{{ toplam }}">{{ toplam }}</p>
+      <p class="mt-1 text-xs text-metin-3">{{ dolu_kategori }} / {{ turler | length }} kategoride belge var</p>
+    </div>
+
+    {# Menu sayaclariyla ayni sorguda hesaplanir (Turkiye saatiyle Pazartesi 00:00'dan beri). #}
+    <div class="renkli-kart ton-gunes kart-giris rounded-2xl border p-5 shadow-kart" style="--i: 2">
+      <div class="flex items-start justify-between">
+        <p class="text-sm font-semibold text-metin-2">Bu hafta yüklenen</p>
+        <span class="renkli-ikon ton-gunes flex h-10 w-10 items-center justify-center rounded-xl">
+          {{ ui.ikon('artis') }}
+        </span>
+      </div>
+      <p class="sayi-gecis mt-1 text-4xl font-extrabold tracking-tight text-metin" data-sayac="{{ bu_hafta_yuklenen }}">{{ bu_hafta_yuklenen }}</p>
+      <p class="mt-1 text-xs text-metin-3">Pazartesiden bu yana</p>
+    </div>
+  </div>
+
+  {# Kategori dagilimi: tek renkli yatay cubuklar, en buyuk deger tam dolar. #}
+  <div class="kart-giris rounded-2xl border border-cizgi bg-kart p-5 shadow-kart lg:col-span-2" style="--i: 3">
+    <div class="mb-4 flex items-start justify-between gap-4">
+      <div>
+        <h2 class="text-sm font-semibold text-metin-2">Kategori dağılımı</h2>
+        <p class="text-xs text-metin-3">Belge sayısına göre sıralı · satıra tıklayarak kategoriye gidin</p>
+      </div>
+      <span class="renkli-ikon ton-pembe flex h-10 w-10 shrink-0 items-center justify-center rounded-xl">
+        {{ ui.ikon('grafik') }}
+      </span>
+    </div>
+
+    {% if toplam %}
+      <ul class="space-y-0.5">
+        {% for kod, ozet in tur_sayilari.items() | sort(attribute='1.adet', reverse=true) %}
+          {% set yuzde = (ozet.adet / toplam * 100) | round | int %}
+          <li>
+            <a href="{{ url_for('kategori', tur=kod) }}"
+               title="{{ turler[kod].ad }}: {{ ozet.adet }} belge (%{{ yuzde }}){% if ozet.son_tarih %} · son yükleme {{ ozet.son_tarih.strftime('%d.%m.%Y') }}{% endif %}"
+               class="group grid grid-cols-[7.5rem_1fr_4.5rem] items-center gap-3 rounded-xl px-2 py-2 transition-colors hover:bg-yuzey sm:grid-cols-[9rem_1fr_5rem]">
+              <span class="flex min-w-0 items-center gap-2 text-sm font-medium text-metin-2 transition-colors group-hover:text-metin">
+                <span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-md {{ ui.renk(kod, 'kutu') }}">{{ ui.tur_ikonu(kod, 'w-3.5 h-3.5') }}</span>
+                <span class="truncate">{{ turler[kod].ad }}</span>
+              </span>
+              <span class="h-2.5 overflow-hidden rounded-full bg-yuzey group-hover:bg-kart">
+                <span class="dagilim-cubugu block h-full rounded-full {{ ui.renk(kod, 'nokta') }} transition-opacity group-hover:opacity-80"
+                      style="--deger: {{ (ozet.adet / en_cok * 100) | round(1) }}%; --i: {{ loop.index0 }}"></span>
+              </span>
+              <span class="text-right text-sm font-bold tabular-nums text-metin">
+                {{ ozet.adet }}<span class="ml-1.5 text-xs font-medium text-metin-3">%{{ yuzde }}</span>
+              </span>
+            </a>
+          </li>
+        {% endfor %}
+      </ul>
+    {% else %}
+      <div class="flex h-40 flex-col items-center justify-center rounded-xl bg-yuzey/60 text-center">
+        <p class="text-sm font-medium text-metin-2">Burası yakında renklenecek</p>
+        <p class="mt-1 text-xs text-metin-3">İlk belgenizi yüklediğinizde dağılım burada görünecek.</p>
+      </div>
+    {% endif %}
+  </div>
+</section>
+
+{# ------------------------------------------------------------ hizli yukleme #}
+<section class="mt-8 grid grid-cols-1 gap-4 lg:grid-cols-3" aria-labelledby="yukleme-bolumu">
+  <div class="kart-giris rounded-2xl border border-cizgi bg-kart p-5 shadow-kart sm:p-6 lg:col-span-2" style="--i: 4">
+    <h2 id="yukleme-bolumu" class="mb-4 text-base font-bold text-metin">Hızlı yükleme</h2>
+    {{ ui.yukleme_formu(buyuk=true) }}
+  </div>
+
+  <div class="kart-giris rounded-2xl border border-cizgi bg-kart p-5 shadow-kart sm:p-6" style="--i: 5">
+    <h2 class="mb-5 text-base font-bold text-metin">Nasıl çalışır?</h2>
+    <ol class="space-y-5">
+      {% set adimlar = [
+        ('gorsel', 'Fotoğrafla', 'Belgenin fotoğrafını çekin ya da PDF’ini hazırlayın.', 'ton-buz'),
+        ('yukle', 'Yükle', 'Sürükleyip bırakın; birden fazla belge olur.', 'ton-gunes'),
+        ('arsiv', 'Düzenli arşivin hazır', 'Türüne göre ayrılır, bilgileri doldurulur, kolayca bulunur.', 'ton-nane'),
+      ] %}
+      {% for ikon_adi, baslik_adi, aciklama, ton in adimlar %}
+        <li class="flex gap-3">
+          <span class="renkli-ikon {{ ton }} flex h-9 w-9 shrink-0 items-center justify-center rounded-xl">{{ ui.ikon(ikon_adi, 'w-[18px] h-[18px]') }}</span>
+          <div>
+            <p class="text-sm font-semibold text-metin">{{ baslik_adi }}</p>
+            <p class="text-xs leading-relaxed text-metin-2">{{ aciklama }}</p>
+          </div>
+        </li>
+      {% endfor %}
+    </ol>
+  </div>
+</section>
+
+{# ------------------------------------------------------------ son yuklenenler #}
+<section class="mt-10" aria-labelledby="son-bolumu">
+  <div class="mb-4 flex flex-wrap items-end justify-between gap-3">
+    <div>
+      <h2 id="son-bolumu" class="text-lg font-bold tracking-tight text-metin">Son yüklenenler</h2>
+      <p class="text-sm text-metin-2">Arşive en son eklenen belgeler
+        <span data-isleniyor-bilgisi {% if not isleniyor_sayisi %}hidden{% endif %} class="ml-1 inline-flex items-center gap-1.5 font-medium text-marka-700 dark:text-marka-300">
+          · <span class="donen-halka donen-kucuk" aria-hidden="true"></span><span data-isleniyor-sayisi>{{ isleniyor_sayisi }}</span> belge işleniyor
+        </span>
+      </p>
+    </div>
+    {% if son_belgeler %}{{ ui.excel_dugmesi({}, 'h-9 px-3 text-xs') }}{% endif %}
+  </div>
+
+  {% if son_belgeler %}
+    <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      {% for b in son_belgeler %}{{ ui.belge_karti(b, loop.index0 + 6) }}{% endfor %}
+    </div>
+  {% else %}
+    {{ ui.bos_durum('kutu', 'Arşiviniz ilk belgesini bekliyor', 'Yukarıdaki alana bir fotoğraf bırakın, gerisini biz halledelim. İlk adım en kolayı!', ton='ton-gunes') }}
+  {% endif %}
+</section>
+
+{% endblock %}

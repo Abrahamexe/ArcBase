@@ -1,0 +1,18 @@
+# Uygulamanin dogrudan kullandigi paketler (surumler sabit).
+# Gelistirme/test araclari requirements-dev.txt icindedir.
+Flask==3.1.3
+Flask-Login==0.6.3
+Flask-WTF==1.3.0
+Flask-Limiter==4.1.1
+gunicorn==26.2.0
+pytesseract==0.3.13
+pillow==12.3.0
+pymupdf==1.28.2
+openai==3.17.0
+python-dotenv==1.2.3
+cryptography==50.0.1
+psycopg2-binary==2.9.13
+opencv-python-headless==5.0.0.93
+numpy==2.5.3
+openpyxl==3.1.5
+python-docx==1.2.0

@@ -1,0 +1,40 @@
+{% extends "_genel_duzen.html" %}
+{% import "_bilesenler.html" as ui with context %}
+{% block baslik %}Giriş yap — ArcBase{% endblock %}
+
+{% block icerik %}
+<div class="flex flex-1 items-center justify-center">
+  <section class="kart-giris w-full max-w-md" style="--i: 0" aria-labelledby="giris-baslik">
+    <div class="rounded-3xl border border-cizgi bg-kart p-6 shadow-yukselt sm:p-8">
+      <span class="mb-5 flex h-12 w-12 items-center justify-center rounded-2xl bg-marka-50 text-marka-600 dark:bg-marka-500/15 dark:text-marka-300">
+        {{ ui.ikon('giris', 'w-6 h-6') }}
+      </span>
+      <h1 id="giris-baslik" class="text-2xl font-extrabold tracking-tight text-metin">Tekrar hoş geldiniz</h1>
+      <p class="mt-1 text-sm text-metin-2">Arşivinize erişmek için giriş yapın.</p>
+
+      <form action="{{ url_for('giris', next=request.args.get('next')) }}" method="post" class="mt-6 space-y-4" data-kimlik-formu>
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        {{ ui.form_hatasi(hata) }}
+        {{ ui.form_alani('kullanici_adi', 'Kullanıcı adı', deger=form.get('kullanici_adi', ''), ikon_adi='kullanici',
+                         otomatik='username', ekstra='required autofocus autocapitalize="none" spellcheck="false"') }}
+        {{ ui.form_alani('sifre', 'Şifre', tur='password', ikon_adi='kilit', otomatik='current-password', ekstra='required') }}
+
+        <label class="flex cursor-pointer items-center gap-2.5 text-sm text-metin-2">
+          <input type="checkbox" name="beni_hatirla" value="1" {% if form.get('beni_hatirla') %}checked{% endif %}
+                 class="h-4 w-4 rounded border-cizgi text-marka-600 accent-marka-600 focus:ring-marka-500">
+          Beni hatırla
+        </label>
+
+        <button type="submit" class="btn btn-birincil w-full" data-mesgul-sifirla>
+          {{ ui.ikon('giris', 'w-4 h-4') }}Giriş yap
+        </button>
+      </form>
+
+      <p class="mt-6 border-t border-cizgi pt-5 text-center text-sm text-metin-2">
+        Hesabınız yok mu?
+        <a href="{{ url_for('kayit') }}" class="font-semibold text-marka-600 hover:underline dark:text-marka-300">Kayıt olun</a>
+      </p>
+    </div>
+  </section>
+</div>
+{% endblock %}

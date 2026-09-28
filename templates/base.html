@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  {% include "_head.html" %}
+  <title>{% block baslik %}ArcBase{% endblock %}</title>
+  {# JS kapaliyken islenmekte olan belgenin sayfasi hazir olana kadar yenilenir. #}
+  {% if otomatik_yenile is defined and otomatik_yenile %}<noscript><meta http-equiv="refresh" content="4"></noscript>{% endif %}
+</head>
+<body class="min-h-screen font-sans text-[15px] antialiased">
+{% import "_bilesenler.html" as ui with context %}
+{% set aktif_endpoint = request.endpoint %}
+{% set secili_tur = aktif_tur if aktif_tur is defined else none %}
+
+{# ================================================================ kenar menu #}
+<aside id="kenar-menu" aria-label="Ana menü"
+       class="kenar fixed inset-y-0 left-0 z-50 flex flex-col border-r border-cizgi bg-kart">
+
+  {# Tum ikonlar dar menunun ortasina (kenar-dar / 2) hizali sabit bir sutunda durur;
+     genislik degisirken yalnizca etiketler solar, ikonlar kaymaz (style.css: kenar menu). #}
+  <div class="kenar-baslik flex h-16 shrink-0 items-center gap-3 border-b border-cizgi">
+    <a href="{{ url_for('index') }}" class="flex min-w-0 items-center gap-3" data-ipucu="ArcBase">
+      <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-marka-600 to-violet-600 text-white shadow-md shadow-violet-600/25">
+        {{ ui.ikon('arsiv', 'w-5 h-5', '2') }}
+      </span>
+      <span class="kenar-etiket leading-tight">
+        <span class="block text-[15px] font-bold tracking-tight text-metin">ArcBase</span>
+        <span class="block text-xs text-metin-3">Belge yönetimi</span>
+      </span>
+    </a>
+    <button type="button" class="ikon-dugmesi ml-auto lg:hidden" data-menu-kapat aria-label="Menüyü kapat">
+      {{ ui.ikon('kapat', 'w-5 h-5') }}
+    </button>
+  </div>
+
+  <div class="px-3 pt-4">
+    <button type="button" data-yukleme-ac data-ipucu="Belge yükle"
+            class="kenar-yukle btn btn-birincil relative w-full">
+      <span class="menu-ikon">{{ ui.ikon('arti', 'w-4 h-4', '2.4') }}</span><span class="kenar-etiket">Belge yükle</span>
+    </button>
+  </div>
+
+  <nav class="flex-1 overflow-y-auto overflow-x-hidden px-3 py-4">
+    <div class="space-y-1">
+      <a href="{{ url_for('index') }}" class="menu-ogesi" data-ipucu="Panel"
+         {% if aktif_endpoint == 'index' %}aria-current="page"{% endif %}>
+        <span class="menu-ikon">{{ ui.ikon('panel', 'w-[18px] h-[18px]') }}</span><span class="kenar-etiket">Panel</span>
+      </a>
+      <a href="{{ url_for('ara') }}" class="menu-ogesi" data-ipucu="Arama"
+         {% if aktif_endpoint == 'ara' %}aria-current="page"{% endif %}>
+        <span class="menu-ikon">{{ ui.ikon('ara', 'w-[18px] h-[18px]') }}</span><span class="kenar-etiket">Arama</span>
+      </a>
+    </div>
+
+    <p class="kenar-bolum mb-2 mt-6 px-3 text-[11px] font-bold uppercase tracking-wider text-metin-3">Kategoriler</p>
+    <div class="space-y-1">
+      {% for kod, bilgi in turler.items() %}
+        <a href="{{ url_for('kategori', tur=kod) }}" class="menu-ogesi" data-ipucu="{{ bilgi.ad }}"
+           {% if secili_tur == kod %}aria-current="page"{% endif %}>
+          <span class="menu-ikon {{ ui.renk(kod, 'kutu') }}">{{ ui.tur_ikonu(kod, 'w-4 h-4') }}</span>
+          <span class="kenar-etiket flex-1">{{ bilgi.ad }}</span>
+          <span class="kenar-etiket min-w-[1.5rem] rounded-md bg-yuzey px-1.5 py-0.5 text-center text-xs font-semibold tabular-nums text-metin-2" data-tur-sayaci="{{ kod }}">{{ tur_sayilari[kod].adet }}</span>
+        </a>
+      {% endfor %}
+    </div>
+  </nav>
+
+  <div class="shrink-0 space-y-1 border-t border-cizgi p-3">
+    <a href="{{ url_for('hesap') }}" class="menu-ogesi" data-ipucu="Hesabım"
+       {% if aktif_endpoint == 'hesap' %}aria-current="page"{% endif %}>
+      <span class="menu-ikon menu-avatar rounded-full bg-gradient-to-br from-marka-600 to-violet-600 text-xs font-bold uppercase text-white"
+            aria-hidden="true">{{ current_user.kullanici_adi[:1] }}</span>
+      <span class="kenar-etiket min-w-0 flex-1 leading-tight">
+        <span class="block truncate font-semibold text-metin">{{ current_user.kullanici_adi }}</span>
+        <span class="block text-xs text-metin-3">Hesabım</span>
+      </span>
+    </a>
+    <form action="{{ url_for('cikis') }}" method="post">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <button type="submit" class="menu-ogesi w-full" data-ipucu="Çıkış yap">
+        <span class="menu-ikon">{{ ui.ikon('cikis', 'w-[18px] h-[18px]') }}</span><span class="kenar-etiket">Çıkış yap</span>
+      </button>
+    </form>
+    <button type="button" data-kenar-daralt aria-label="Menüyü daralt"
+            class="menu-ogesi hidden w-full lg:flex" data-ipucu="Menüyü genişlet">
+      <span class="menu-ikon"><span class="daralt-ikon">{{ ui.ikon('kenar', 'w-[18px] h-[18px]') }}</span></span><span class="kenar-etiket">Menüyü daralt</span>
+    </button>
+  </div>
+</aside>
+
+<div class="menu-perde fixed inset-0 z-40 bg-slate-950/40 backdrop-blur-[2px] lg:hidden" data-menu-kapat></div>
+
+{# ================================================================ icerik #}
+<div class="ana flex min-h-screen flex-col">
+
+  <header class="ust-cubuk sticky top-0 z-30 border-b border-cizgi bg-zemin/80 backdrop-blur-xl">
+    <div class="flex h-16 items-center gap-2 px-4 sm:gap-3 sm:px-6 lg:px-8">
+      <button type="button" class="ikon-dugmesi -ml-2 lg:hidden" data-menu-ac aria-label="Menüyü aç">
+        {{ ui.ikon('menu') }}
+      </button>
+
+      <form action="{{ url_for('ara') }}" method="get" role="search" class="relative w-full max-w-xl">
+        <label for="ust-arama" class="sr-only">Belgelerde ara</label>
+        <span class="pointer-events-none absolute inset-y-0 left-3 flex items-center text-metin-3">
+          {{ ui.ikon('ara', 'w-[18px] h-[18px]') }}
+        </span>
+        <input type="search" id="ust-arama" name="q" value="{{ arama_sorgusu }}" autocomplete="off"
+               placeholder="Belgelerde ara…"
+               class="h-10 w-full rounded-xl border border-cizgi bg-kart pl-10 pr-12 text-sm text-metin shadow-kart
+                      placeholder:text-metin-3 transition focus:border-marka-500 focus:outline-none focus:ring-4 focus:ring-marka-500/15">
+        <kbd class="pointer-events-none absolute right-2.5 top-1/2 hidden -translate-y-1/2 rounded-md border border-cizgi bg-yuzey px-1.5 py-0.5 text-[11px] font-semibold text-metin-3 sm:block">/</kbd>
+      </form>
+
+      <div class="ml-auto flex items-center gap-1">
+        <button type="button" class="tema-dugmesi ikon-dugmesi relative" data-tema-degistir
+                aria-label="Temayı değiştir" title="Açık / koyu tema">
+          <span class="ikon-gunes">{{ ui.ikon('gunes') }}</span>
+          <span class="ikon-ay">{{ ui.ikon('ay') }}</span>
+        </button>
+        <button type="button" class="btn btn-birincil h-10 w-10 px-0 lg:hidden" data-yukleme-ac aria-label="Belge yükle">
+          {{ ui.ikon('arti', 'w-5 h-5', '2.2') }}
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main id="icerik" class="sayfa-icerik mx-auto w-full max-w-7xl flex-1 px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
+    {% block icerik %}{% endblock %}
+  </main>
+</div>
+
+{# ================================================================ bildirimler (flash) #}
+{% include "_bildirimler.html" %}
+
+{# ================================================================ yukleme penceresi #}
+<dialog id="yukleme-penceresi" class="pencere" aria-labelledby="yukleme-baslik">
+  <div class="w-[min(92vw,560px)] rounded-3xl border border-cizgi bg-kart p-5 shadow-yukselt sm:p-6">
+    <div class="mb-5 flex items-start justify-between gap-4">
+      <div>
+        <h2 id="yukleme-baslik" class="text-lg font-bold tracking-tight text-metin">Belge yükle</h2>
+        <p class="mt-0.5 text-sm text-metin-2">Belgenin fotoğrafını yükleyin, gerisini biz halledelim. Birden fazla dosya seçebilirsiniz.</p>
+      </div>
+      <button type="button" class="ikon-dugmesi -mr-2 -mt-1" data-pencere-kapat aria-label="Kapat">{{ ui.ikon('kapat') }}</button>
+    </div>
+    {{ ui.yukleme_formu() }}
+  </div>
+</dialog>
+
+{# ================================================================ toplu yukleme sablonlari
+   app.js yukleme kuyrugundaki her dosya icin bu satiri kopyalar; sonuc gelince
+   ilgili turun rozeti eklenir. Siniflar sunucuda yazildigi icin Tailwind gorur. #}
+<template id="kuyruk-satiri-sablonu">
+  <li class="kuyruk-satiri flex items-center gap-3 rounded-xl border border-cizgi bg-kart px-3 py-2.5 shadow-kart" data-durum="secildi">
+    <span class="kuyruk-ikon relative flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-yuzey text-metin-2">
+      <span class="kuyruk-dosya">{{ ui.ikon('dosya', 'w-[18px] h-[18px]') }}</span>
+      <span class="kuyruk-donen donen-halka" aria-hidden="true"></span>
+      <span class="kuyruk-tik">{{ ui.ikon('tik', 'w-[18px] h-[18px]', '2.6') }}</span>
+      <span class="kuyruk-hata">{{ ui.ikon('hata', 'w-[18px] h-[18px]') }}</span>
+    </span>
+    <div class="min-w-0 flex-1">
+      <p class="truncate text-sm font-semibold text-metin" data-ad></p>
+      <p class="kuyruk-bilgi truncate text-xs text-metin-3" data-bilgi></p>
+    </div>
+    <span class="flex shrink-0 items-center gap-2" data-sonuc></span>
+    <button type="button" class="ikon-dugmesi h-8 w-8 shrink-0" data-kaldir aria-label="Listeden kaldır">{{ ui.ikon('kapat', 'w-4 h-4') }}</button>
+  </li>
+</template>
+{% for kod in turler %}<template data-rozet-sablonu="{{ kod }}">{{ ui.tur_rozeti(kod) }}</template>{% endfor %}
+
+{# ================================================================ surukle-birak perdesi #}
+<div class="surukle-perde fixed inset-0 z-[80] flex items-center justify-center bg-marka-600/10 p-6 backdrop-blur-sm" aria-hidden="true">
+  <div class="surukle-kutu flex flex-col items-center rounded-3xl border-2 border-dashed border-marka-500 bg-kart/95 px-12 py-10 text-center shadow-yukselt">
+    <span class="mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-marka-600 text-white">{{ ui.ikon('yukle', 'w-7 h-7') }}</span>
+    <p class="font-bold text-metin">Yüklemek için bırakın</p>
+    <p class="mt-1 text-sm text-metin-2">JPG veya PNG en fazla 10 MB · PDF en fazla 5 MB</p>
+  </div>
+</div>
+
+{% block pencereler %}{% endblock %}
+
+<script src="{{ url_for('static', filename='app.js') }}" data-durum-adresi="{{ url_for('isleme_durumu') }}"></script>
+</body>
+</html>

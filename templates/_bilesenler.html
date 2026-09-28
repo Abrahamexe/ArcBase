@@ -1,0 +1,479 @@
+{# Sayfalar arasinda paylasilan arayuz parcalari.
+   Kullanim: {% import "_bilesenler.html" as ui with context %}
+
+   Tailwind derleyicisi (tailwind.config.js) sinif adlarini sablon metninden
+   taradigi icin tum sinif adlari burada tam metin olarak yazilir (string
+   birlestirme ile uretilmez). #}
+
+{# ---------------------------------------------------------------- ikonlar
+   Lucide ikon seti (ISC lisansi), 24x24 cizgi ikonlar. #}
+{% set IKONLAR = {
+  'panel': '<rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/>',
+  'ara': '<circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/>',
+  'ara-yok': '<circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/><path d="m13.5 8.5-5 5"/><path d="m8.5 8.5 5 5"/>',
+  'yukle': '<path d="M12 13v8"/><path d="M4 14.899A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.5 8.242"/><path d="m8 17 4-4 4 4"/>',
+  'arti': '<path d="M5 12h14"/><path d="M12 5v14"/>',
+  'gunes': '<circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/>',
+  'ay': '<path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/>',
+  'menu': '<path d="M4 6h16"/><path d="M4 12h16"/><path d="M4 18h16"/>',
+  'kapat': '<path d="M18 6 6 18"/><path d="m6 6 12 12"/>',
+  'sol': '<path d="m15 18-6-6 6-6"/>',
+  'sag': '<path d="m9 18 6-6-6-6"/>',
+  'geri': '<path d="m12 19-7-7 7-7"/><path d="M19 12H5"/>',
+  'kenar': '<rect width="18" height="18" x="3" y="3" rx="2"/><path d="M9 3v18"/><path d="m16 15-3-3 3-3"/>',
+  'indir': '<path d="M12 15V3"/><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/>',
+  'sil': '<path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><path d="M10 11v6"/><path d="M14 11v6"/>',
+  'fatura': '<path d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1Z"/><path d="M16 8h-6a2 2 0 1 0 0 4h4a2 2 0 1 1 0 4H8"/><path d="M12 17.5v-11"/>',
+  'sozlesme': '<path d="M15 12h-5"/><path d="M15 8h-5"/><path d="M19 17V5a2 2 0 0 0-2-2H4"/><path d="M8 21h12a2 2 0 0 0 2-2v-1a1 1 0 0 0-1-1H11a1 1 0 0 0-1 1v1a2 2 0 1 1-4 0V5a2 2 0 1 0-4 0v2a1 1 0 0 0 1 1h3"/>',
+  'kimlik': '<path d="M16 10h2"/><path d="M16 14h2"/><path d="M6.17 15a3 3 0 0 1 5.66 0"/><circle cx="9" cy="11" r="2"/><rect x="2" y="5" width="20" height="14" rx="2"/>',
+  'dilekce': '<path d="M12 20h9"/><path d="M16.376 3.622a1 1 0 0 1 3.002 3.002L7.368 18.635a2 2 0 0 1-.855.506l-2.872.838a.5.5 0 0 1-.62-.62l.838-2.872a2 2 0 0 1 .506-.854z"/>',
+  'resmi_yazi': '<path d="M3 22h18"/><path d="M6 18v-7"/><path d="M10 18v-7"/><path d="M14 18v-7"/><path d="M18 18v-7"/><path d="M12 2 20 7H4z"/>',
+  'dosya': '<path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/>',
+  'dosya-metin': '<path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/>',
+  'arsiv': '<rect width="20" height="5" x="2" y="3" rx="1"/><path d="M4 8v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8"/><path d="M10 12h4"/>',
+  'takvim': '<path d="M8 2v4"/><path d="M16 2v4"/><rect width="18" height="18" x="3" y="4" rx="2"/><path d="M3 10h18"/>',
+  'yildiz': '<path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z"/>',
+  'tik': '<path d="M20 6 9 17l-5-5"/>',
+  'tik-daire': '<circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/>',
+  'uyari': '<path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/>',
+  'hata': '<circle cx="12" cy="12" r="10"/><path d="M12 8v4"/><path d="M12 16h.01"/>',
+  'buyut': '<path d="M15 3h6v6"/><path d="M9 21H3v-6"/><path d="M21 3l-7 7"/><path d="M3 21l7-7"/>',
+  'yakinlas': '<circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/><path d="M11 8v6"/><path d="M8 11h6"/>',
+  'tara': '<path d="M3 7V5a2 2 0 0 1 2-2h2"/><path d="M17 3h2a2 2 0 0 1 2 2v2"/><path d="M21 17v2a2 2 0 0 1-2 2h-2"/><path d="M7 21H5a2 2 0 0 1-2-2v-2"/><path d="M7 8h8"/><path d="M7 12h10"/><path d="M7 16h6"/>',
+  'veritabani': '<ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v14a9 3 0 0 0 18 0V5"/><path d="M3 12a9 3 0 0 0 18 0"/>',
+  'kalkan': '<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/>',
+  'grafik': '<path d="M3 3v18h18"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/>',
+  'artis': '<path d="M22 7 13.5 15.5 8.5 10.5 2 17"/><path d="M16 7h6v6"/>',
+  'kopyala': '<rect width="14" height="14" x="8" y="8" rx="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/>',
+  'yenile': '<path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/>',
+  'gorsel': '<rect width="18" height="18" x="3" y="3" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/>',
+  'kutu': '<path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/>',
+  'bilgi': '<circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/>',
+  'kalem': '<path d="M12 20h9"/><path d="M16.376 3.622a1 1 0 0 1 3.002 3.002L7.368 18.635a2 2 0 0 1-.855.506l-2.872.838a.5.5 0 0 1-.62-.62l.838-2.872a2 2 0 0 1 .506-.854z"/>',
+  'saat': '<circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>',
+  'klasor': '<path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/>',
+  'kullanici': '<path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>',
+  'kilit': '<rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>',
+  'giris': '<path d="m10 17 5-5-5-5"/><path d="M15 12H3"/><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/>',
+  'cikis': '<path d="m16 17 5-5-5-5"/><path d="M21 12H9"/><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>',
+  'tablo': '<path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M8 13h2"/><path d="M14 13h2"/><path d="M8 17h2"/><path d="M14 17h2"/>',
+  'filtre': '<path d="M10 20a1 1 0 0 0 .553.895l2 1A1 1 0 0 0 14 21v-7a2 2 0 0 1 .517-1.341L21.74 4.67A1 1 0 0 0 21 3H3a1 1 0 0 0-.742 1.67l7.225 7.989A2 2 0 0 1 10 14z"/>',
+  'para': '<rect width="20" height="12" x="2" y="6" rx="2"/><circle cx="12" cy="12" r="2"/><path d="M6 12h.01M18 12h.01"/>',
+  'sihir': '<path d="m21.64 3.64-1.28-1.28a1.21 1.21 0 0 0-1.72 0L2.36 18.64a1.21 1.21 0 0 0 0 1.72l1.28 1.28a1.2 1.2 0 0 0 1.72 0L21.64 5.36a1.2 1.2 0 0 0 0-1.72"/><path d="m14 7 3 3"/><path d="M5 6v4"/><path d="M19 14v4"/><path d="M10 2v2"/><path d="M7 8H3"/><path d="M21 16h-4"/><path d="M11 3H9"/>',
+  'karsilastir': '<rect width="18" height="18" x="3" y="3" rx="2"/><path d="M12 3v18"/>',
+  'kirp': '<path d="M6 2v14a2 2 0 0 0 2 2h14"/><path d="M18 22V8a2 2 0 0 0-2-2H2"/>',
+  'goz': '<path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0"/><circle cx="12" cy="12" r="3"/>',
+} %}
+
+{% macro ikon(ad, sinif="w-5 h-5", kalinlik="1.8") -%}
+  <svg class="{{ sinif }}" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+       stroke-width="{{ kalinlik }}" stroke-linecap="round" stroke-linejoin="round"
+       aria-hidden="true" focusable="false">{{ (IKONLAR[ad] or IKONLAR['dosya']) | safe }}</svg>
+{%- endmacro %}
+
+{# Tur kodunun ikonu; listede olmayan yeni bir tur eklenirse dosya ikonuna duser. #}
+{% macro tur_ikonu(kod, sinif="w-5 h-5") -%}
+  {{ ikon(kod if kod in IKONLAR else 'dosya', sinif) }}
+{%- endmacro %}
+
+{# ---------------------------------------------------------------- renkler
+   database.TURLER icindeki renk adini (amber, indigo, ...) sinif gruplarina cevirir.
+   rozet: kucuk etiket · kutu: ikon arka plani · nokta: tek renkli isaret #}
+{% set RENKLER = {
+  'amber': {
+    'rozet': 'bg-amber-50 text-amber-700 ring-amber-600/20 dark:bg-amber-400/10 dark:text-amber-300 dark:ring-amber-400/25',
+    'kutu': 'bg-amber-100 text-amber-700 dark:bg-amber-400/15 dark:text-amber-300',
+    'nokta': 'bg-amber-500',
+  },
+  'indigo': {
+    'rozet': 'bg-violet-50 text-violet-700 ring-violet-600/20 dark:bg-violet-400/10 dark:text-violet-300 dark:ring-violet-400/25',
+    'kutu': 'bg-violet-100 text-violet-700 dark:bg-violet-400/15 dark:text-violet-300',
+    'nokta': 'bg-violet-500',
+  },
+  'emerald': {
+    'rozet': 'bg-emerald-50 text-emerald-700 ring-emerald-600/20 dark:bg-emerald-400/10 dark:text-emerald-300 dark:ring-emerald-400/25',
+    'kutu': 'bg-emerald-100 text-emerald-700 dark:bg-emerald-400/15 dark:text-emerald-300',
+    'nokta': 'bg-emerald-500',
+  },
+  'sky': {
+    'rozet': 'bg-sky-50 text-sky-700 ring-sky-600/20 dark:bg-sky-400/10 dark:text-sky-300 dark:ring-sky-400/25',
+    'kutu': 'bg-sky-100 text-sky-700 dark:bg-sky-400/15 dark:text-sky-300',
+    'nokta': 'bg-sky-500',
+  },
+  'rose': {
+    'rozet': 'bg-rose-50 text-rose-700 ring-rose-600/20 dark:bg-rose-400/10 dark:text-rose-300 dark:ring-rose-400/25',
+    'kutu': 'bg-rose-100 text-rose-700 dark:bg-rose-400/15 dark:text-rose-300',
+    'nokta': 'bg-rose-500',
+  },
+  'slate': {
+    'rozet': 'bg-slate-100 text-slate-700 ring-slate-500/20 dark:bg-slate-400/10 dark:text-slate-300 dark:ring-slate-400/25',
+    'kutu': 'bg-slate-100 text-slate-600 dark:bg-slate-400/15 dark:text-slate-300',
+    'nokta': 'bg-slate-400',
+  },
+} %}
+
+{% macro renk(kod, parca) -%}
+  {{- (RENKLER[turler[kod].renk] or RENKLER['slate'])[parca] -}}
+{%- endmacro %}
+
+{# ---------------------------------------------------------------- rozetler #}
+{% macro tur_rozeti(kod, ekstra="") -%}
+  <span class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ring-inset {{ renk(kod, 'rozet') }} {{ ekstra }}">
+    {{ tur_ikonu(kod, "w-3.5 h-3.5") }}{{ turler[kod].ad }}
+  </span>
+{%- endmacro %}
+
+{% macro dusuk_guven_rozeti(ekstra="") -%}
+  <span class="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ring-inset bg-orange-50 text-orange-700 ring-orange-600/20 dark:bg-orange-400/10 dark:text-orange-300 dark:ring-orange-400/25 {{ ekstra }}">
+    {{ ikon('uyari', "w-3.5 h-3.5") }}Kontrol edilmeli
+  </span>
+{%- endmacro %}
+
+{# Arka planda OCR/siniflandirma suren belge (app.js durumu yoklar). #}
+{% macro isleme_rozeti(ekstra="") -%}
+  <span class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ring-inset bg-marka-50 text-marka-700 ring-marka-600/20 dark:bg-marka-400/10 dark:text-marka-300 dark:ring-marka-400/25 {{ ekstra }}">
+    <span class="donen-halka donen-kucuk" aria-hidden="true"></span>İşleniyor
+  </span>
+{%- endmacro %}
+
+{% macro isleme_hatasi_rozeti(ekstra="") -%}
+  <span class="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ring-inset bg-rose-50 text-rose-700 ring-rose-600/20 dark:bg-rose-400/10 dark:text-rose-300 dark:ring-rose-400/25 {{ ekstra }}">
+    {{ ikon('hata', "w-3.5 h-3.5") }}İşlenemedi
+  </span>
+{%- endmacro %}
+
+{% macro elle_rozeti() -%}
+  <span class="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ring-inset bg-yuzey text-metin-2 ring-cizgi">
+    {{ ikon('kalem', "w-3.5 h-3.5") }}Elle düzeltildi
+  </span>
+{%- endmacro %}
+
+{% macro dusuk_guven_mi(b) -%}
+  {{- 'evet' if (b.guven is not none and b.guven < dusuk_guven_siniri) else '' -}}
+{%- endmacro %}
+
+{# ---------------------------------------------------------------- tarih
+   Veritabani saati UTC (Neon, TimeZone=GMT). Sunucu UTC degeri yazar, app.js
+   bunu tarayicinin saat dilimine cevirip "2 saat once" gibi gosterir. #}
+{% macro zaman(dt, bicim="goreli", sinif="") -%}
+  <time datetime="{{ dt.strftime('%Y-%m-%dT%H:%M:%SZ') }}" data-zaman="{{ bicim }}" class="{{ sinif }}"
+        title="{{ dt.strftime('%d.%m.%Y %H:%M') }} (UTC)">{{ dt.strftime('%d.%m.%Y %H:%M') }}</time>
+{%- endmacro %}
+
+{# ---------------------------------------------------------------- belge karti
+   i: giris animasyonu icin karttaki sira numarasi. Onizleme adresi icerik
+   surumunu tasir (?v=): tarayici kucuk resmi sormadan onbellekten kullanir,
+   kose degisince adres degisir. Islenmekte olan kartlari app.js yoklar ve
+   hazir olunca yenisiyle degistirir. #}
+{% macro belge_karti(b, i=0) -%}
+  {% set uzanti = 'PDF' if b.mime_type == 'application/pdf' else b.mime_type.split('/')[-1] | upper | replace('JPEG', 'JPG') %}
+  {% set isleniyor = b.isleme_durumu in ('bekliyor', 'isleniyor') %}
+  <a href="{{ url_for('belge', belge_id=b.id) }}" data-belge-id="{{ b.id }}" {% if isleniyor %}data-isleniyor{% endif %}
+     class="belge-karti kart-giris group block overflow-hidden rounded-2xl border border-cizgi bg-kart shadow-kart
+            focus:outline-none focus-visible:ring-2 focus-visible:ring-marka-500 focus-visible:ring-offset-2 focus-visible:ring-offset-zemin"
+     style="--i: {{ i }}">
+    <div class="iskelet relative aspect-[4/3] overflow-hidden border-b border-cizgi bg-yuzey">
+      {% if b.onizleme_var %}
+        <img src="{{ url_for('onizleme', belge_id=b.id, v=b.icerik_surumu) }}" alt="" loading="lazy" decoding="async"
+             class="gorsel-yavas h-full w-full object-cover object-top transition-transform duration-500 ease-out group-hover:scale-[1.04]">
+      {% else %}
+        <div class="flex h-full w-full items-center justify-center">
+          <span class="flex h-14 w-14 items-center justify-center rounded-2xl {{ renk(b.tur, 'kutu') }}">
+            {{ tur_ikonu(b.tur, "w-7 h-7") }}
+          </span>
+        </div>
+      {% endif %}
+      <span class="absolute right-2.5 top-2.5 rounded-md bg-slate-900/70 px-1.5 py-0.5 text-[10px] font-bold tracking-wider text-white backdrop-blur-sm">{{ uzanti }}</span>
+      {% if dusuk_guven_mi(b) %}
+        <span class="absolute left-2.5 top-2.5">{{ dusuk_guven_rozeti("shadow-sm !bg-orange-50 dark:!bg-orange-950") }}</span>
+      {% endif %}
+    </div>
+    <div class="space-y-2.5 p-4">
+      <p class="truncate text-sm font-semibold text-metin transition-colors group-hover:text-marka-600 dark:group-hover:text-marka-300"
+         title="{{ b.dosya_adi }}">{{ b.dosya_adi }}</p>
+      {% if b.belge_tarihi or b.tutar is not none %}
+        <p class="flex items-center justify-between gap-2 text-xs text-metin-2">
+          {% if b.belge_tarihi %}
+            <span class="inline-flex items-center gap-1" title="Belge tarihi">{{ ikon('takvim', 'w-3.5 h-3.5 text-metin-3') }}{{ b.belge_tarihi | tarih }}</span>
+          {% endif %}
+          {% if b.tutar is not none %}
+            <span class="ml-auto font-bold tabular-nums text-metin" title="Tutar">{{ b.tutar | tutar(b.para_birimi) }}</span>
+          {% endif %}
+        </p>
+      {% endif %}
+      <div class="flex items-center justify-between gap-2">
+        {% if isleniyor %}{{ isleme_rozeti() }}{% elif b.isleme_durumu == 'hata' %}{{ isleme_hatasi_rozeti() }}{% else %}{{ tur_rozeti(b.tur) }}{% endif %}
+        {{ zaman(b.yuklenme_tarihi, sinif="shrink-0 text-xs text-metin-3") }}
+      </div>
+    </div>
+  </a>
+{%- endmacro %}
+
+{# ---------------------------------------------------------------- bos durum #}
+{# ton: ton-buz | ton-gunes | ton-pembe | ton-nane (style.css) #}
+{% macro bos_durum(ikon_adi, baslik, aciklama, eylem="", ton="ton-buz") -%}
+  <div class="bos-durum kart-giris flex flex-col items-center justify-center rounded-2xl border border-dashed border-cizgi bg-kart px-6 py-14 text-center">
+    <span class="bos-durum-sahne mb-5" aria-hidden="true">
+      <span class="bos-durum-hale {{ ton }}"></span>
+      <span class="bos-durum-ikon renkli-ikon {{ ton }}">{{ ikon(ikon_adi, "w-8 h-8") }}</span>
+      <span class="bos-parilti p1">{{ ikon('yildiz', 'w-3.5 h-3.5') }}</span>
+      <span class="bos-parilti p2">{{ ikon('yildiz', 'w-2.5 h-2.5') }}</span>
+      <span class="bos-parilti p3"></span>
+    </span>
+    <p class="font-semibold text-metin">{{ baslik }}</p>
+    <p class="mt-1 max-w-sm text-sm text-metin-2">{{ aciklama }}</p>
+    {% if eylem %}<div class="mt-5">{{ eylem }}</div>{% endif %}
+  </div>
+{%- endmacro %}
+
+{# ---------------------------------------------------------------- sayfalama
+   Sayfalama sablon tarafinda yapilir (backend tum listeyi dondurur).
+   kwargs: url_for'a aktarilacak ek parametreler (tur=..., q=...). #}
+{% macro sayfalama(sayfa, toplam_sayfa, endpoint) -%}
+  {% if toplam_sayfa > 1 %}
+    {% set onceki = url_for(endpoint, **kwargs) if sayfa - 1 == 1 else url_for(endpoint, sayfa=sayfa - 1, **kwargs) %}
+    {% set sonraki = url_for(endpoint, sayfa=sayfa + 1, **kwargs) %}
+    <nav aria-label="Sayfalama" class="kart-giris mt-8 flex items-center justify-center gap-1.5" style="--i: 6">
+      {% if sayfa > 1 %}
+        <a href="{{ onceki }}" class="sayfa-dugmesi" rel="prev" aria-label="Önceki sayfa">{{ ikon('sol', 'w-4 h-4') }}<span class="hidden sm:inline">Önceki</span></a>
+      {% else %}
+        <span class="sayfa-dugmesi" aria-disabled="true">{{ ikon('sol', 'w-4 h-4') }}<span class="hidden sm:inline">Önceki</span></span>
+      {% endif %}
+
+      {% for n in range(1, toplam_sayfa + 1) %}
+        {% if n == 1 or n == toplam_sayfa or (n - sayfa) | abs <= 1 %}
+          {% if n == sayfa %}
+            <span class="sayfa-dugmesi sayfa-no" aria-current="page">{{ n }}</span>
+          {% else %}
+            <a href="{{ url_for(endpoint, **kwargs) if n == 1 else url_for(endpoint, sayfa=n, **kwargs) }}"
+               class="sayfa-dugmesi sayfa-no">{{ n }}</a>
+          {% endif %}
+        {% elif n == 2 or n == toplam_sayfa - 1 %}
+          <span class="px-1 text-metin-3" aria-hidden="true">…</span>
+        {% endif %}
+      {% endfor %}
+
+      {% if sayfa < toplam_sayfa %}
+        <a href="{{ sonraki }}" class="sayfa-dugmesi" rel="next" aria-label="Sonraki sayfa"><span class="hidden sm:inline">Sonraki</span>{{ ikon('sag', 'w-4 h-4') }}</a>
+      {% else %}
+        <span class="sayfa-dugmesi" aria-disabled="true"><span class="hidden sm:inline">Sonraki</span>{{ ikon('sag', 'w-4 h-4') }}</span>
+      {% endif %}
+    </nav>
+  {% endif %}
+{%- endmacro %}
+
+{# ---------------------------------------------------------------- suzgecler
+   Kategori ve arama sayfalarindaki filtre/siralama formu (GET). JS gerekmez.
+   eylem: formun gonderilecegi (ve "Temizle"nin donecegi) adres.
+   gizli: formla birlikte aynen gonderilecek parametreler (arama: q, tur).
+   suzgec: app._suzgecler()'in URL degerleri; dolu olanlar formda gosterilir. #}
+{% macro suzgec_formu(eylem, suzgec, gizli={}, tutar=false) -%}
+  {% set aktif = suzgec | length %}
+  {% set girdi = 'h-10 w-full rounded-xl border border-cizgi bg-kart px-3 text-sm text-metin shadow-kart placeholder:text-metin-3 transition focus:border-marka-500 focus:outline-none focus:ring-4 focus:ring-marka-500/15' %}
+  <details class="suzgec kart-giris mb-6 rounded-2xl border border-cizgi bg-kart shadow-kart" style="--i: 2" {% if aktif %}open{% endif %}>
+    <summary class="flex cursor-pointer list-none items-center gap-2 px-4 py-3 text-sm font-semibold text-metin">
+      {{ ikon('filtre', 'w-4 h-4 text-metin-3') }}Filtrele ve sırala
+      {% if aktif %}<span class="rounded-full bg-marka-600 px-2 py-0.5 text-[11px] font-bold text-white">{{ aktif }}</span>{% endif %}
+      <span class="acilir-ok ml-auto text-metin-3">{{ ikon('sag', 'w-4 h-4 rotate-90') }}</span>
+    </summary>
+    <form action="{{ eylem }}" method="get"
+          class="grid grid-cols-1 gap-3 border-t border-cizgi px-4 pb-4 pt-3 sm:grid-cols-2 lg:grid-cols-4">
+      {% for ad, deger in gizli.items() if deger %}
+        <input type="hidden" name="{{ ad }}" value="{{ deger }}">
+      {% endfor %}
+      <label class="block">
+        <span class="mb-1 block text-xs font-semibold text-metin-2">Belge tarihi (başlangıç)</span>
+        <input type="date" name="baslangic" value="{{ suzgec.baslangic or '' }}" class="{{ girdi }}">
+      </label>
+      <label class="block">
+        <span class="mb-1 block text-xs font-semibold text-metin-2">Belge tarihi (bitiş)</span>
+        <input type="date" name="bitis" value="{{ suzgec.bitis or '' }}" class="{{ girdi }}">
+      </label>
+      <label class="block">
+        <span class="mb-1 block text-xs font-semibold text-metin-2">Kurum / firma</span>
+        <input type="text" name="kurum" value="{{ suzgec.kurum or '' }}" maxlength="100" placeholder="Örn. Enerjisa" class="{{ girdi }}">
+      </label>
+      <label class="block">
+        <span class="mb-1 block text-xs font-semibold text-metin-2">Sıralama</span>
+        <select name="siralama" class="{{ girdi }}">
+          {% for kod, ad in [('yukleme', 'Yüklenme tarihi (yeni → eski)'), ('tarih', 'Belge tarihi (yeni → eski)'), ('tutar', 'Tutar (yüksek → düşük)')] if tutar or kod != 'tutar' %}
+            <option value="{{ kod }}" {% if (suzgec.siralama or 'yukleme') == kod %}selected{% endif %}>{{ ad }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      {% if tutar %}
+        <label class="block">
+          <span class="mb-1 block text-xs font-semibold text-metin-2">En az tutar</span>
+          <input type="text" inputmode="decimal" name="min_tutar" value="{{ suzgec.min_tutar or '' }}" placeholder="0" class="{{ girdi }}">
+        </label>
+        <label class="block">
+          <span class="mb-1 block text-xs font-semibold text-metin-2">En çok tutar</span>
+          <input type="text" inputmode="decimal" name="maks_tutar" value="{{ suzgec.maks_tutar or '' }}" placeholder="Sınırsız" class="{{ girdi }}">
+        </label>
+      {% endif %}
+      <div class="flex flex-wrap items-end gap-2 sm:col-span-2 {{ 'lg:col-span-2' if tutar else 'lg:col-span-4' }} lg:justify-end">
+        {% if aktif %}
+          <a href="{{ eylem }}{{ ('?' ~ (gizli | urlencode)) if gizli else '' }}" class="btn btn-ikincil h-10">{{ ikon('kapat', 'w-4 h-4') }}Temizle</a>
+        {% endif %}
+        <button type="submit" class="btn btn-birincil h-10">{{ ikon('filtre', 'w-4 h-4') }}Uygula</button>
+      </div>
+    </form>
+  </details>
+{%- endmacro %}
+
+{# ---------------------------------------------------------------- coklu secim
+   "Sec" modunda kartlara tiklamak secer (secim sirasi numarasiyla); cubuktan
+   secilenler tek PDF'te birlestirilir. Yalnizca JS ile calisir (buton gizli baslar). #}
+{% macro secim_dugmesi(sinif="") -%}
+  <button type="button" class="btn btn-ikincil {{ sinif }}" data-secim-ac aria-pressed="false" hidden>
+    {{ ikon('tik-daire', 'w-4 h-4') }}Seç
+  </button>
+{%- endmacro %}
+
+{% macro secim_cubugu() -%}
+  <form action="{{ url_for('pdf_birlestir') }}" method="post" data-secim-cubugu data-sinir="{{ pdf_birlestirme_siniri }}" hidden
+        class="secim-cubugu sticky bottom-4 z-20 mx-auto mt-6 flex max-w-3xl flex-wrap items-center gap-2 rounded-2xl border border-cizgi bg-kart/95 p-3 shadow-yukselt backdrop-blur">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <p class="min-w-0 flex-1 text-sm font-semibold text-metin" aria-live="polite">
+      <span data-secim-sayisi>0</span> belge seçili
+      <span class="font-normal text-metin-3">· en fazla {{ pdf_birlestirme_siniri }} · seçim sırasıyla birleştirilir</span>
+    </p>
+    <button type="button" class="btn btn-ikincil h-9 px-3 text-xs" data-tumunu-sec>Tümünü seç</button>
+    <button type="button" class="btn btn-ikincil h-9 px-3 text-xs" data-secimi-temizle>Temizle</button>
+    <label class="sr-only" for="birlestirme-modu">Tarama modu</label>
+    <select id="birlestirme-modu" name="mod" class="h-9 rounded-xl border border-cizgi bg-kart px-2 text-xs font-semibold text-metin">
+      <option value="renkli">Renkli tarama</option>
+      <option value="gri">Gri</option>
+      <option value="sb">Siyah-beyaz</option>
+    </select>
+    <button type="submit" class="btn btn-birincil h-9 px-3 text-xs" data-birlestir disabled>
+      {{ ikon('dosya-metin', 'w-4 h-4') }}Seçilenleri PDF yap
+    </button>
+    <button type="button" class="ikon-dugmesi h-9 w-9" data-secim-kapat aria-label="Seçim modunu kapat">{{ ikon('kapat', 'w-4 h-4') }}</button>
+    <p data-secim-hata role="alert" hidden class="w-full rounded-lg bg-rose-50 px-3 py-2 text-xs font-medium text-rose-700 dark:bg-rose-500/10 dark:text-rose-300"></p>
+  </form>
+{%- endmacro %}
+
+{# Excel'e aktar baglantisi: sayfadaki suzgecler aynen disa aktarmaya gecer.
+   Panelde (args bos) tum arsiv aktarilir. #}
+{% macro excel_dugmesi(args={}, sinif="") -%}
+  <a href="{{ url_for('disa_aktar', **args) }}" class="btn btn-ikincil {{ sinif }}" data-excel download>
+    {{ ikon('tablo', 'w-4 h-4') }}Excel'e aktar
+  </a>
+{%- endmacro %}
+
+{# ---------------------------------------------------------------- yukleme formu
+   Hem dashboard'da hem de her sayfadan acilan yukleme penceresinde kullanilir.
+   JS varken dosyalar sirayla, tek tek fetch ile gonderilir ve her biri icin
+   durum gosterilir (app.js). JS kapaliyken normal bir multipart form
+   gonderimidir; sunucu yalnizca ilk dosyayi isler. #}
+{% macro yukleme_formu(buyuk=false) -%}
+  {% if kota_doldu %}
+  <div class="flex flex-col items-center justify-center rounded-2xl border-2 border-dashed border-rose-200 bg-rose-50/50 text-center dark:border-rose-500/25 dark:bg-rose-500/5 {{ 'px-6 py-12 sm:py-14' if buyuk else 'px-6 py-10' }}"
+       data-kota-doldu>
+    <span class="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-kart text-rose-600 shadow-kart ring-1 ring-cizgi dark:text-rose-300">
+      {{ ikon('veritabani', 'w-7 h-7') }}
+    </span>
+    <p class="font-semibold text-metin">Belge kotanız doldu</p>
+    <p class="mt-1 max-w-sm text-sm text-metin-2">
+      Hesap başına en fazla {{ belge_limiti }} belge saklanabilir. Yeni belge yüklemek için
+      artık gerekmeyen belgeleri silin.
+    </p>
+    <a href="{{ url_for('hesap') }}" class="btn btn-ikincil mt-5">{{ ikon('kullanici', 'w-4 h-4') }}Kotayı görüntüle</a>
+  </div>
+  {% else %}
+  <form action="{{ url_for('yukle') }}" method="post" enctype="multipart/form-data"
+        data-yukleme-formu data-kalan-kota="{{ kalan_kota }}" data-arsiv-adresi="{{ url_for('index') }}" novalidate>
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <label data-birakma
+           class="birakma-alani group relative flex cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed border-cizgi bg-yuzey/50 text-center transition-colors
+                  hover:border-marka-400 hover:bg-marka-50/60 dark:hover:bg-marka-500/5
+                  focus-within:border-marka-500 {{ 'px-6 py-12 sm:py-14' if buyuk else 'px-6 py-10' }}">
+      <input type="file" name="belge" accept=".jpg,.jpeg,.png,.pdf" multiple class="sr-only" data-dosya-girisi>
+      <span class="yukle-ikonu mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-kart text-marka-600 shadow-kart ring-1 ring-cizgi dark:text-marka-300">
+        {{ ikon('yukle', 'w-7 h-7') }}
+      </span>
+      <p class="font-semibold text-metin" data-birakma-baslik>Belgenin fotoğrafını yükleyin, gerisini biz halledelim</p>
+      <p class="mt-1 text-sm text-metin-2">veya <span class="font-semibold text-marka-600 underline-offset-4 group-hover:underline dark:text-marka-300">bilgisayarınızdan seçin</span></p>
+      <p class="mt-3 text-xs text-metin-3">Tek seferde en fazla {{ toplu_yukleme_siniri }} dosya · JPG veya PNG en fazla 10 MB · PDF en fazla 5 MB</p>
+    </label>
+
+    {# Secilen dosyalar; yukleme baslayinca her satir kendi durumunu gosterir (app.js). #}
+    <ul class="mt-3 space-y-2" data-kuyruk hidden aria-live="polite"></ul>
+
+    <p data-form-hata role="alert" hidden
+       class="mt-3 flex items-center gap-2 rounded-xl bg-rose-50 px-3 py-2 text-sm font-medium text-rose-700 dark:bg-rose-500/10 dark:text-rose-300"></p>
+
+    <p data-isleme-notu hidden class="mt-3 flex items-center gap-2 rounded-xl bg-marka-50 px-3 py-2 text-sm font-medium text-marka-700 dark:bg-marka-500/10 dark:text-marka-300">
+      <span class="donen-halka donen-kucuk" aria-hidden="true"></span>
+      <span>Belgeler yüklendi, arka planda okunup sınıflandırılıyor. Pencereyi kapatabilirsiniz; arşivde hazır olunca görünürler.</span>
+    </p>
+
+    {# Toplu yukleme bitince ozet #}
+    <div data-ozet hidden class="yukleme-ozeti mt-4 flex flex-col gap-3 rounded-xl border p-4 sm:flex-row sm:items-center sm:justify-between">
+      <p class="flex items-center gap-2 text-sm font-semibold text-metin">
+        <span class="basari-ikon flex h-8 w-8 shrink-0 items-center justify-center rounded-full">{{ ikon('tik', 'w-4 h-4', '2.8') }}</span>
+        <span data-ozet-metni></span>
+      </p>
+      <div class="flex gap-2">
+        <button type="button" class="btn btn-ikincil flex-1 sm:flex-none" data-yeniden>{{ ikon('arti', 'w-4 h-4', '2.4') }}Yeni yükleme</button>
+        <a href="{{ url_for('index') }}" class="btn btn-birincil flex-1 sm:flex-none">{{ ikon('arsiv', 'w-4 h-4') }}Arşive git</a>
+      </div>
+    </div>
+
+    <div data-kontroller>
+      {# Kapaliyken yalnizca gizli "0" gider; aciksa son deger "1" olur (app.yukle). #}
+      <input type="hidden" name="otomatik_duzelt" value="0">
+      <label class="mt-4 flex cursor-pointer items-start gap-3 rounded-xl border border-cizgi bg-yuzey/40 px-3 py-2.5">
+        <input type="checkbox" name="otomatik_duzelt" value="1" checked class="anahtar mt-0.5" data-duzelt-anahtari>
+        <span class="min-w-0">
+          <span class="block text-sm font-semibold text-metin">Otomatik kırp ve düzelt</span>
+          <span class="block text-xs text-metin-3">Fotoğraftaki kâğıdı kırpıp düzeltir. Taranmış belgelerde kapatabilirsiniz.</span>
+        </span>
+      </label>
+
+      <div class="mt-4 flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <p class="flex items-center gap-1.5 text-xs text-metin-3">
+          {{ ikon('kalkan', 'w-4 h-4 text-turkuaz-600') }}
+          Belgeleriniz güvende; yalnızca siz görebilirsiniz.
+        </p>
+        <button type="submit" data-gonder class="btn btn-birincil w-full sm:w-auto">
+          {{ ikon('yildiz', 'w-4 h-4') }}<span data-gonder-etiket>Yükle ve analiz et</span>
+        </button>
+      </div>
+    </div>
+  </form>
+  {% endif %}
+{%- endmacro %}
+
+{# ---------------------------------------------------------------- form parcalari
+   Giris, kayit ve hesap sayfalarindaki metin kutulari. #}
+{% macro form_alani(ad, etiket, tur="text", deger="", ikon_adi="", ipucu="", otomatik="", ekstra="") -%}
+  <div>
+    <label for="alan-{{ ad }}" class="mb-1.5 block text-sm font-semibold text-metin">{{ etiket }}</label>
+    <div class="relative">
+      {% if ikon_adi %}
+        <span class="pointer-events-none absolute inset-y-0 left-3 flex items-center text-metin-3">{{ ikon(ikon_adi, 'w-[18px] h-[18px]') }}</span>
+      {% endif %}
+      <input type="{{ tur }}" id="alan-{{ ad }}" name="{{ ad }}" value="{{ deger }}"
+             {% if otomatik %}autocomplete="{{ otomatik }}"{% endif %} {% if ipucu %}aria-describedby="alan-{{ ad }}-ipucu"{% endif %} {{ ekstra | safe }}
+             class="h-11 w-full rounded-xl border border-cizgi bg-kart {{ 'pl-10' if ikon_adi else 'pl-3.5' }} {{ 'pr-11' if tur == 'password' else 'pr-3.5' }} text-sm text-metin shadow-kart
+                    placeholder:text-metin-3 transition focus:border-marka-500 focus:outline-none focus:ring-4 focus:ring-marka-500/15">
+      {% if tur == 'password' %}
+        <button type="button" data-sifre-goster aria-label="Şifreyi göster" aria-pressed="false"
+                class="absolute inset-y-0 right-1 my-auto flex h-9 w-9 items-center justify-center rounded-lg text-metin-3 transition hover:bg-yuzey hover:text-metin">
+          {{ ikon('goz', 'w-[18px] h-[18px]') }}
+        </button>
+      {% endif %}
+    </div>
+    {% if ipucu %}<p id="alan-{{ ad }}-ipucu" class="mt-1.5 text-xs text-metin-3">{{ ipucu }}</p>{% endif %}
+  </div>
+{%- endmacro %}
+
+{% macro form_hatasi(mesaj) -%}
+  {% if mesaj %}
+    <p role="alert" class="titret flex items-start gap-2 rounded-xl bg-rose-50 px-3 py-2.5 text-sm font-medium text-rose-700 dark:bg-rose-500/10 dark:text-rose-300">
+      {{ ikon('hata', 'w-4 h-4 mt-0.5 shrink-0') }}<span>{{ mesaj }}</span>
+    </p>
+  {% endif %}
+{%- endmacro %}

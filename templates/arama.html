@@ -1,0 +1,114 @@
+{% extends "base.html" %}
+{% import "_bilesenler.html" as ui with context %}
+{% block baslik %}{% if sorgu %}“{{ sorgu }}” araması{% else %}Arama{% endif %} — ArcBase{% endblock %}
+
+{% block icerik %}
+{# Tur suzgeci ve sayfalama sablonda yapilir; backend q ve tarih/kurum suzgeclerini uygular. #}
+{% set tur_suzgeci = request.args.get('tur') if request.args.get('tur') in turler else none %}
+{% set sonuclar = (belgeler | selectattr('tur', 'equalto', tur_suzgeci) | list) if tur_suzgeci else belgeler %}
+{% set sayfa_boyu = 12 %}
+{% set toplam = sonuclar | length %}
+{% set toplam_sayfa = [(toplam + sayfa_boyu - 1) // sayfa_boyu, 1] | max %}
+{% set sayfa = [[(request.args.get('sayfa') or 1) | int, 1] | max, toplam_sayfa] | min %}
+{% set bas = (sayfa - 1) * sayfa_boyu %}
+
+<header class="kart-giris mb-6" style="--i: 0">
+  <h1 class="text-2xl font-extrabold tracking-tight text-metin sm:text-[28px]">Arama</h1>
+  <p class="mt-1 text-sm text-metin-2">Dosya adlarında, belgelerin içindeki yazılarda ve bilgilerinde (kurum, konu, fatura no…) arayın.</p>
+</header>
+
+<form action="{{ url_for('ara') }}" method="get" role="search" class="kart-giris relative mb-6" style="--i: 1">
+  <label for="sayfa-arama" class="sr-only">Arama terimi</label>
+  <span class="pointer-events-none absolute inset-y-0 left-4 flex items-center text-metin-3">{{ ui.ikon('ara', 'w-5 h-5') }}</span>
+  <input type="search" id="sayfa-arama" name="q" value="{{ sorgu }}" {% if not sorgu %}autofocus{% endif %}
+         placeholder="Örn. fatura numarası, kurum adı, kişi adı…" autocomplete="off"
+         class="h-14 w-full rounded-2xl border border-cizgi bg-kart pl-12 pr-32 text-base text-metin shadow-kart
+                placeholder:text-metin-3 transition focus:border-marka-500 focus:outline-none focus:ring-4 focus:ring-marka-500/15">
+  <button type="submit" class="btn btn-birincil absolute right-2 top-2 h-10">Ara</button>
+</form>
+
+{% if sorgu %}
+  {{ ui.suzgec_formu(url_for('ara'), suzgec, gizli=({'q': sorgu, 'tur': tur_suzgeci} if tur_suzgeci else {'q': sorgu})) }}
+
+  <div class="kart-giris mb-6 flex flex-col gap-3" style="--i: 2">
+    <div class="flex flex-wrap items-center justify-between gap-3">
+    <p class="text-sm text-metin-2" aria-live="polite">
+      <span class="font-semibold text-metin">“{{ sorgu }}”</span> için
+      <span class="font-semibold text-metin">{{ belgeler | length }}</span> sonuç bulundu{% if belgeler | length >= arama_siniri %} (ilk {{ arama_siniri }} eşleşme gösteriliyor){% endif %}.
+    </p>
+    {% if sonuclar %}
+      <div class="flex gap-2">
+        {{ ui.secim_dugmesi('h-9 px-3 text-xs') }}
+        {{ ui.excel_dugmesi(dict(suzgec, q=sorgu, tur=tur_suzgeci) if tur_suzgeci else dict(suzgec, q=sorgu), 'h-9 px-3 text-xs') }}
+      </div>
+    {% endif %}
+    </div>
+
+    {% if belgeler %}
+      <div class="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1" role="group" aria-label="Türe göre süz">
+        {% set secili_sinif = 'border-marka-600 bg-marka-600 text-white shadow-sm shadow-marka-600/25' %}
+        {% set normal_sinif = 'border-cizgi bg-kart text-metin-2 hover:border-marka-400 hover:text-metin' %}
+        <a href="{{ url_for('ara', q=sorgu, **suzgec) }}"
+           class="inline-flex shrink-0 items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-sm font-semibold transition-colors {{ secili_sinif if not tur_suzgeci else normal_sinif }}"
+           {% if not tur_suzgeci %}aria-current="true"{% endif %}>
+          Tümü <span class="tabular-nums opacity-70">{{ belgeler | length }}</span>
+        </a>
+        {% for kod, bilgi in turler.items() %}
+          {% set adet = belgeler | selectattr('tur', 'equalto', kod) | list | length %}
+          {% if adet %}
+            <a href="{{ url_for('ara', q=sorgu, tur=kod, **suzgec) }}"
+               class="inline-flex shrink-0 items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-sm font-semibold transition-colors {{ secili_sinif if tur_suzgeci == kod else normal_sinif }}"
+               {% if tur_suzgeci == kod %}aria-current="true"{% endif %}>
+              {{ ui.tur_ikonu(kod, 'w-3.5 h-3.5') }}{{ bilgi.ad }} <span class="tabular-nums opacity-70">{{ adet }}</span>
+            </a>
+          {% endif %}
+        {% endfor %}
+      </div>
+    {% endif %}
+  </div>
+
+  {% if sonuclar %}
+    <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4" data-vurgula="{{ sorgu }}">
+      {% for b in sonuclar[bas:bas + sayfa_boyu] %}{{ ui.belge_karti(b, loop.index0 + 3) }}{% endfor %}
+    </div>
+    {{ ui.secim_cubugu() }}
+    {{ ui.sayfalama(sayfa, toplam_sayfa, 'ara', q=sorgu, tur=tur_suzgeci, **suzgec) }}
+    {% if toplam_sayfa > 1 %}
+      <p class="mt-3 text-center text-xs text-metin-3">
+        {{ bas + 1 }}–{{ [bas + sayfa_boyu, toplam] | min }} arası gösteriliyor · toplam {{ toplam }} sonuç
+      </p>
+    {% endif %}
+  {% else %}
+    {{ ui.bos_durum('ara-yok', 'Bu sefer bulamadık', 'Farklı ya da daha kısa bir kelime deneyin; belgelerin içindeki yazılarda da arıyoruz.', ton='ton-gunes') }}
+  {% endif %}
+
+{% else %}
+  <div class="kart-giris rounded-2xl border border-cizgi bg-kart p-6 shadow-kart sm:p-8" style="--i: 2">
+    <div class="flex flex-col gap-6 sm:flex-row sm:items-center">
+      <span class="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-marka-50 text-marka-600 dark:bg-marka-500/10 dark:text-marka-300">
+        {{ ui.ikon('tara', 'w-7 h-7') }}
+      </span>
+      <div>
+        <p class="font-semibold text-metin">Belgenin içinde geçen herhangi bir kelimeyi arayabilirsiniz</p>
+        <p class="mt-1 text-sm text-metin-2">
+          Belgelerin içindeki yazılar da aranır; fatura numarası, kurum adı veya kişi adı gibi ifadelerle
+          belgeyi bulabilirsiniz. İpucu: herhangi bir sayfada <kbd class="rounded-md border border-cizgi bg-yuzey px-1.5 py-0.5 text-xs font-semibold">/</kbd>
+          tuşuna basarak aramaya geçin.
+        </p>
+      </div>
+    </div>
+    <div class="mt-6 border-t border-cizgi pt-5">
+      <p class="mb-3 text-xs font-bold uppercase tracking-wider text-metin-3">Kategorilere göz atın</p>
+      <div class="flex flex-wrap gap-2">
+        {% for kod, bilgi in turler.items() %}
+          <a href="{{ url_for('kategori', tur=kod) }}"
+             class="inline-flex items-center gap-2 rounded-full border border-cizgi bg-kart px-3 py-1.5 text-sm font-semibold text-metin-2 transition-colors hover:border-marka-400 hover:text-metin">
+            <span class="flex h-5 w-5 items-center justify-center rounded {{ ui.renk(kod, 'kutu') }}">{{ ui.tur_ikonu(kod, 'w-3 h-3') }}</span>
+            {{ bilgi.ad }} <span class="tabular-nums text-metin-3">{{ tur_sayilari[kod].adet }}</span>
+          </a>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+{% endif %}
+{% endblock %}

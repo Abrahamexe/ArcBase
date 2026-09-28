@@ -1,0 +1,5 @@
+# Testler icin: pip install -r requirements-dev.txt
+-r requirements.txt
+pytest==9.1.1
+# Tarayici testleri (tests/test_arayuz.py); ayrica: playwright install chromium
+playwright==1.63.0

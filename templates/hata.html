@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  {% include "_head.html" %}
+  <title>{{ baslik }} — ArcBase</title>
+</head>
+<body class="min-h-screen font-sans antialiased">
+{% import "_bilesenler.html" as ui with context %}
+{# Veritabani/sifreleme hatasi, 404 ve 429'da gosterilir; base.html'i kullanmaz cunku menu
+   veritabanindan beslenir. #}
+<main class="flex min-h-screen items-center justify-center p-6">
+  <div class="kart-giris w-full max-w-lg rounded-3xl border border-cizgi bg-kart p-8 text-center shadow-yukselt sm:p-10">
+    <span class="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-2xl bg-amber-50 text-amber-600 dark:bg-amber-500/15 dark:text-amber-300">
+      {{ ui.ikon('uyari', 'w-8 h-8') }}
+    </span>
+    <h1 class="text-xl font-bold tracking-tight text-metin">{{ baslik }}</h1>
+    <p class="mt-2 break-words text-sm text-metin-2">{{ mesaj }}</p>
+
+    {% if ipuclari is not defined or ipuclari %}
+    <div class="mt-6 rounded-2xl bg-yuzey p-4 text-left text-xs leading-relaxed text-metin-2">
+      <p class="mb-1.5 flex items-center gap-1.5 font-semibold text-metin">{{ ui.ikon('bilgi', 'w-4 h-4') }}Ne yapabilirsiniz?</p>
+      <ul class="list-disc space-y-1 pl-5">
+        <li>Birkaç saniye bekleyip sayfayı yenileyin; sistem uykudan uyanıyor olabilir.</li>
+        <li>Sorun sürerse biraz sonra tekrar deneyin. Belgeleriniz güvende.</li>
+      </ul>
+    </div>
+    {% endif %}
+
+    <a href="{{ url_for('index') }}" class="btn btn-birincil mt-6">
+      {% if ipuclari is not defined or ipuclari %}{{ ui.ikon('yenile', 'w-4 h-4') }}Tekrar dene{% else %}{{ ui.ikon('geri', 'w-4 h-4') }}Ana sayfaya dön{% endif %}
+    </a>
+  </div>
+</main>
+</body>
+</html>

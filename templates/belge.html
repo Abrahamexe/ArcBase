@@ -1,0 +1,487 @@
+{% extends "base.html" %}
+{% import "_bilesenler.html" as ui with context %}
+{% set aktif_tur = belge.tur %}
+{% set otomatik_yenile = isleniyor %}
+{% block baslik %}{{ belge.dosya_adi }} — ArcBase{% endblock %}
+
+{% block icerik %}
+{% set pdf_mi = belge.mime_type == 'application/pdf' %}
+{% set guven = belge.guven or 0 %}
+{% set yuzde = (guven * 100) | round | int %}
+{% set dusuk = ui.dusuk_guven_mi(belge) %}
+{# Gorseller tarama filtresiyle gosterilir (varsayilan renkli); PDF ilk sayfasi aynen.
+   Islenirken yuklemedeki hizli onizleme gosterilir. Adresler icerik surumunu
+   tasir (?v=); kose degisince adres degisir, tarayici eskisini kullanmaz. #}
+{% if isleniyor %}
+  {% set gorunum_adresi = url_for('onizleme', belge_id=belge.id, v=belge.icerik_surumu) %}
+{% elif pdf_mi %}
+  {% set gorunum_adresi = url_for('gorsel', belge_id=belge.id, v=belge.icerik_surumu) %}
+{% else %}
+  {% set gorunum_adresi = url_for('tarama_onizleme', belge_id=belge.id, v=belge.icerik_surumu, mod=gorunum_modu) %}
+{% endif %}
+
+<nav aria-label="Konum" class="kart-giris mb-5 flex min-w-0 items-center gap-1.5 text-sm text-metin-3" style="--i: 0">
+  <a href="{{ url_for('index') }}" class="shrink-0 font-medium transition-colors hover:text-metin">Panel</a>
+  {{ ui.ikon('sag', 'w-3.5 h-3.5 shrink-0') }}
+  <a href="{{ url_for('kategori', tur=belge.tur) }}" class="shrink-0 font-medium transition-colors hover:text-metin">{{ turler[belge.tur].ad }}</a>
+  {{ ui.ikon('sag', 'w-3.5 h-3.5 shrink-0') }}
+  <span class="truncate font-semibold text-metin-2">{{ belge.dosya_adi }}</span>
+</nav>
+
+<div class="grid grid-cols-1 gap-6 lg:grid-cols-5">
+
+  {# ------------------------------------------------------------ onizleme #}
+  <section class="kart-giris lg:col-span-3" style="--i: 1" aria-label="Belge önizlemesi" data-tarama
+           data-adres="{{ url_for('tarama_onizleme', belge_id=belge.id, v=belge.icerik_surumu) }}">
+    <div class="rounded-2xl border border-cizgi bg-kart p-3 shadow-kart sm:p-4">
+      {% if not pdf_mi and not isleniyor %}
+        {# Mod secici: JS varken sayfa yenilenmeden gorsel degisir; yokken ?mod= baglantisidir. #}
+        <div class="mb-3 flex flex-wrap items-center justify-between gap-2">
+          <div class="segment" role="radiogroup" aria-label="Görünüm modu">
+            {% for kod, ad in gorunum_modlari.items() %}
+              <a href="{{ url_for('belge', belge_id=belge.id, mod=kod) }}" role="radio" data-mod="{{ kod }}"
+                 aria-checked="{{ 'true' if kod == gorunum_modu else 'false' }}" class="segment-dugmesi">{{ ad }}</a>
+            {% endfor %}
+          </div>
+          <div class="flex gap-2">
+            <button type="button" class="btn btn-ikincil h-9 px-3 text-xs" data-karsilastir aria-pressed="false" hidden
+                    title="Filtresiz fotoğraf ile tarama sonucunu yan yana karşılaştır">
+              {{ ui.ikon('karsilastir', 'w-4 h-4') }}Önce | sonra
+            </button>
+            {% if kose_ayarlanabilir %}
+              <button type="button" class="btn btn-ikincil h-9 px-3 text-xs" data-kose-ac aria-pressed="false" hidden
+                      title="Kırpmayı elle düzeltin: kağıdın dört köşesini sürükleyin">
+                {{ ui.ikon('kirp', 'w-4 h-4') }}Köşeleri ayarla
+              </button>
+            {% endif %}
+          </div>
+        </div>
+      {% endif %}
+      <div class="relative">
+        <button type="button" data-isik-kutusu-ac
+                class="onizleme-cercevesi iskelet group relative block min-h-[16rem] w-full overflow-hidden rounded-xl bg-yuzey
+                       focus:outline-none focus-visible:ring-2 focus-visible:ring-marka-500"
+                aria-label="Tam ekran önizlemeyi aç">
+          <img src="{{ gorunum_adresi }}" alt="{{ belge.dosya_adi }} önizlemesi" data-tarama-gorsel
+               class="tarama-gorsel gorsel-yavas mx-auto max-h-[75vh] w-full object-contain">
+          <span class="buyut-ipucu pointer-events-none absolute bottom-3 right-3 inline-flex items-center gap-1.5 rounded-lg bg-slate-900/75 px-2.5 py-1.5 text-xs font-semibold text-white backdrop-blur">
+            {{ ui.ikon('buyut', 'w-3.5 h-3.5') }}Tam ekran
+          </span>
+        </button>
+        {% if not pdf_mi and not isleniyor %}
+          {# Onceki | sonraki: altta filtresiz fotograf, ustte secili mod; ayirici surgu ile kaydirilir. #}
+          <div class="karsilastirma overflow-hidden rounded-xl bg-yuzey" data-karsilastirma hidden>
+            <img alt="Filtresiz fotoğraf" data-once draggable="false">
+            <img alt="Tarama sonucu" data-sonra draggable="false">
+            <span class="karsilastirma-etiket left-3">Önce</span>
+            <span class="karsilastirma-etiket right-3">Sonra</span>
+            <span class="ayirici" aria-hidden="true"></span>
+            <input type="range" min="0" max="100" value="50" aria-label="Karşılaştırma ayırıcısı" data-ayirici>
+          </div>
+        {% endif %}
+        {% if kose_ayarlanabilir %}
+          {# Kose editoru (yalnizca JS): kirpilmamis orijinal uzerinde 4 surüklenebilir tutamac.
+             Koseler saklanan gorselin piksel koordinatlarindadir. #}
+          <div data-kose-editoru hidden
+               data-gorsel="{{ url_for('gorsel', belge_id=belge.id, ham=1, v=belge.icerik_surumu) }}"
+               data-otomatik-adres="{{ url_for('koseleri_algila', belge_id=belge.id) }}"
+               data-kaydet-adres="{{ url_for('koseleri_kaydet', belge_id=belge.id) }}"
+               data-koseler='{{ belge.koseler | tojson }}'>
+            <p class="mb-2 text-xs text-metin-2">
+              Mavi tutamaçları kağıdın dört köşesine sürükleyin. Klavyede tutamaç seçiliyken ok tuşları (Shift ile hızlı) kullanılabilir.
+            </p>
+            <div class="kose-sahne mx-auto" data-kose-sahne>
+              <img alt="Kırpılmamış orijinal fotoğraf" data-kose-gorsel draggable="false">
+              <svg class="kose-cizim" data-kose-cizim preserveAspectRatio="none" aria-hidden="true">
+                <path class="kose-dis" fill-rule="evenodd"></path>
+                <polygon class="kose-cizgi"></polygon>
+              </svg>
+              {% for ad in ['Sol üst', 'Sağ üst', 'Sağ alt', 'Sol alt'] %}
+                <button type="button" class="kose-tutamac" data-tutamac="{{ loop.index0 }}" aria-label="{{ ad }} köşe"></button>
+              {% endfor %}
+              <div class="buyutec" data-buyutec hidden></div>
+            </div>
+            <div class="mt-3 flex flex-wrap items-center gap-2">
+              <button type="button" class="btn btn-ikincil h-9 px-3 text-xs" data-kose-otomatik>{{ ui.ikon('sihir', 'w-4 h-4') }}Otomatik algıla</button>
+              <button type="button" class="btn btn-ikincil h-9 px-3 text-xs" data-kose-tumu>{{ ui.ikon('buyut', 'w-4 h-4') }}Tüm görsel</button>
+              <span class="flex-1"></span>
+              <button type="button" class="btn btn-ikincil h-9 px-3 text-xs" data-kose-vazgec>Vazgeç</button>
+              <button type="button" class="btn btn-birincil h-9 px-3 text-xs" data-kose-kaydet>{{ ui.ikon('tik', 'w-4 h-4', '2.4') }}Kaydet</button>
+            </div>
+            <p class="mt-2 text-xs text-metin-3" data-kose-mesaj role="status">Kaydedince metin yeniden okunur (birkaç saniye sürebilir).</p>
+          </div>
+        {% endif %}
+        <span class="tarama-yukleniyor" data-tarama-yukleniyor hidden>
+          <span class="donen-halka" aria-hidden="true"></span><span class="sr-only">Yükleniyor</span>
+        </span>
+      </div>
+      <div class="mt-3 flex items-center justify-between gap-3 px-1 text-xs text-metin-3">
+        <span class="inline-flex items-center gap-1.5">
+          {{ ui.ikon('dosya-metin' if pdf_mi else 'gorsel', 'w-3.5 h-3.5') }}
+          {% if pdf_mi %}PDF'in ilk sayfası gösteriliyor, tamamı için indirin.{% else %}Büyütmek için görsele tıklayın.{% endif %}
+        </span>
+        <a href="{{ url_for('indir', belge_id=belge.id) }}" download class="shrink-0 font-semibold text-marka-600 hover:underline dark:text-marka-300">Orijinali indir</a>
+      </div>
+      {% if not pdf_mi %}
+      <p class="mt-2 flex items-start gap-1.5 px-1 text-xs text-metin-3">
+        {{ ui.ikon('bilgi', 'w-3.5 h-3.5 mt-px shrink-0') }}
+        {% if belge.orijinal_saklandi %}
+          "Orijinali indir" fotoğrafın kırpılmamış halini verir (küçültülüp sıkıştırılmış).
+        {% elif not kose_ayarlanabilir %}
+          Bu belge eski sürümle yüklendi; köşeleri sonradan ayarlanamaz.
+        {% else %}
+          Görseller yer kazanmak için küçültülüp sıkıştırılarak saklanır; indirilen dosya bu sıkıştırılmış haldir.
+        {% endif %}
+      </p>
+      {% endif %}
+    </div>
+  </section>
+
+  {# ------------------------------------------------------------ bilgiler #}
+  <div class="space-y-4 lg:col-span-2">
+    {% if isleniyor %}
+      {# Arka planda isleniyor: app.js durumu yoklar, bitince sayfayi yeniler. #}
+      <section class="kart-giris rounded-2xl border border-marka-200 bg-marka-50/70 p-5 shadow-kart dark:border-marka-500/30 dark:bg-marka-500/10"
+               style="--i: 2" data-belge-isleniyor="{{ belge.id }}" aria-live="polite">
+        <p class="flex items-center gap-2 text-sm font-bold text-metin"><span class="donen-halka donen-kucuk" aria-hidden="true"></span>Belge işleniyor</p>
+        <ol class="mt-3 space-y-1.5 text-sm text-metin-2">
+          {% for kod, ad in [('goruntu', 'Görüntü düzeltiliyor, metin okunuyor'), ('siniflandirma', 'Türü ve bilgileri belirleniyor')] %}
+            {% set bitti = kod == 'goruntu' and isleme_asamasi == 'siniflandirma' %}
+            <li class="flex items-center gap-2 {{ 'text-metin-3' if not bitti and kod != isleme_asamasi else '' }}">
+              {% if bitti %}{{ ui.ikon('tik', 'w-4 h-4 text-turkuaz-600', '2.6') }}{% elif kod == isleme_asamasi %}<span class="donen-halka donen-kucuk" aria-hidden="true"></span>{% else %}<span class="inline-block h-4 w-4 rounded-full border-2 border-cizgi" aria-hidden="true"></span>{% endif %}
+              {{ ad }}
+            </li>
+          {% endfor %}
+        </ol>
+        <p class="mt-3 text-xs text-metin-3">Beklemeniz gerekmiyor; sayfa hazır olunca kendiliğinden güncellenir.</p>
+      </section>
+    {% elif isleme_hatasi %}
+      <section class="kart-giris rounded-2xl border border-rose-200 bg-rose-50/70 p-5 shadow-kart dark:border-rose-500/30 dark:bg-rose-500/10" style="--i: 2" data-isleme-hatasi>
+        <p class="flex items-center gap-2 text-sm font-bold text-metin">{{ ui.ikon('hata', 'w-4 h-4 text-rose-600') }}Belge işlenemedi</p>
+        <p class="mt-1 text-xs text-metin-2">{{ isleme_hatasi }}</p>
+        <form action="{{ url_for('yeniden_isle', belge_id=belge.id) }}" method="post" class="mt-3" data-kimlik-formu>
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <button type="submit" class="btn btn-birincil h-9 px-3 text-xs" data-mesgul-sifirla>{{ ui.ikon('yenile', 'w-4 h-4') }}Yeniden işle</button>
+        </form>
+      </section>
+    {% endif %}
+    {% if isleme_uyarilari %}
+      <section class="kart-giris rounded-2xl border border-amber-200 bg-amber-50/70 p-5 shadow-kart dark:border-amber-500/30 dark:bg-amber-500/10" style="--i: 2" data-isleme-uyarilari>
+        <p class="flex items-center gap-2 text-sm font-bold text-metin">{{ ui.ikon('uyari', 'w-4 h-4 text-amber-600') }}İşlenirken dikkat edilmesi gerekenler</p>
+        <ul class="mt-1 space-y-1 text-xs text-metin-2">
+          {% for uyari in isleme_uyarilari %}<li>{{ uyari }}</li>{% endfor %}
+        </ul>
+      </section>
+    {% endif %}
+    {% if kirpma_kontrol and kose_ayarlanabilir %}
+      {# Kose algilama emin degildi: kose editorunu acan baglanti (kirpma kaydedilince kalkar). #}
+      <section class="kart-giris rounded-2xl border border-orange-200 bg-orange-50/70 p-5 shadow-kart dark:border-orange-500/30 dark:bg-orange-500/10" style="--i: 2" data-kirpma-kontrol>
+        <p class="flex items-center gap-2 text-sm font-bold text-metin">{{ ui.ikon('kirp', 'w-4 h-4 text-orange-600') }}Kırpma otomatik algılandı ama emin olunamadı</p>
+        <p class="mt-1 text-xs text-metin-2">Kâğıdın kenarları tam seçilmemiş olabilir; köşeleri kontrol edip gerekirse sürükleyerek düzeltin.</p>
+        <a href="{{ url_for('belge', belge_id=belge.id, koseler=1) }}" class="btn btn-ikincil mt-3 h-9 px-3 text-xs">{{ ui.ikon('kirp', 'w-4 h-4') }}Kırpmayı kontrol et</a>
+      </section>
+    {% endif %}
+    {% if not isleniyor %}
+    {# Siniflandirma yapilamamis belge (orn. o an servise ulasilamadi): tek tikla yeniden dene. #}
+    {% if not yeniden_analiz_oner and belge.guven == 0 and belge.ocr_metni and not belge.elle_duzeltildi %}
+      <section class="kart-giris rounded-2xl border border-amber-200 bg-amber-50/70 p-5 shadow-kart dark:border-amber-500/30 dark:bg-amber-500/10" style="--i: 2" data-yeniden-dene>
+        <p class="flex items-center gap-2 text-sm font-bold text-metin">{{ ui.ikon('uyari', 'w-4 h-4 text-amber-600') }}Belgenin türü belirlenemedi</p>
+        <p class="mt-1 text-xs text-metin-2">
+          Yükleme sırasında belge incelenemedi. Metni okundu; türünü ve bilgilerini şimdi yeniden belirleyebiliriz.
+        </p>
+        <form action="{{ url_for('yeniden_analiz', belge_id=belge.id) }}" method="post" class="mt-3" data-kimlik-formu>
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <button type="submit" class="btn btn-birincil h-9 px-3 text-xs" data-mesgul-sifirla>
+            {{ ui.ikon('yenile', 'w-4 h-4') }}Yeniden dene
+          </button>
+        </form>
+      </section>
+    {% endif %}
+    {% if yeniden_analiz_oner %}
+      <section class="kart-giris rounded-2xl border border-marka-200 bg-marka-50/70 p-5 shadow-kart dark:border-marka-500/30 dark:bg-marka-500/10" style="--i: 2" data-yeniden-analiz-onerisi>
+        <p class="flex items-center gap-2 text-sm font-bold text-metin">{{ ui.ikon('yildiz', 'w-4 h-4 text-marka-600') }}Kırpma kaydedildi</p>
+        <p class="mt-1 text-xs text-metin-2">
+          Belgenin türünü ve bilgilerini yeni haline göre güncellemek ister misiniz? Elle düzelttikleriniz değişmez.
+        </p>
+        <form action="{{ url_for('yeniden_analiz', belge_id=belge.id) }}" method="post" class="mt-3" data-kimlik-formu>
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <button type="submit" class="btn btn-birincil h-9 px-3 text-xs" data-mesgul-sifirla>
+            {{ ui.ikon('yildiz', 'w-4 h-4') }}Bilgileri güncelle
+          </button>
+        </form>
+      </section>
+    {% endif %}
+
+    <section class="kart-giris rounded-2xl border border-cizgi bg-kart p-5 shadow-kart sm:p-6" style="--i: 2">
+      <div class="mb-4 flex items-start gap-3">
+        <span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl {{ ui.renk(belge.tur, 'kutu') }}">
+          {{ ui.tur_ikonu(belge.tur, 'w-6 h-6') }}
+        </span>
+        <h1 class="min-w-0 break-words pt-0.5 text-lg font-bold leading-snug tracking-tight text-metin">{{ belge.dosya_adi }}</h1>
+      </div>
+
+      <div class="mb-5 flex flex-wrap gap-1.5">
+        {{ ui.tur_rozeti(belge.tur) }}
+        {% if belge.elle_duzeltildi %}{{ ui.elle_rozeti() }}{% endif %}
+        {% if belge.otomatik_duzeltildi %}
+          <span class="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ring-inset bg-teal-50 text-teal-700 ring-teal-600/20 dark:bg-teal-400/10 dark:text-teal-300 dark:ring-teal-400/25"
+                title="Fotoğraftaki belge otomatik olarak kırpılıp düzeltildi">
+            {{ ui.ikon('sihir', 'w-3.5 h-3.5') }}Otomatik düzeltildi
+          </span>
+        {% endif %}
+        {% if belge.orijinal_saklandi and belge.koseler and not belge.otomatik_duzeltildi %}
+          <span class="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ring-inset bg-teal-50 text-teal-700 ring-teal-600/20 dark:bg-teal-400/10 dark:text-teal-300 dark:ring-teal-400/25"
+                title="Kırpma köşeleri elle ayarlandı">
+            {{ ui.ikon('kirp', 'w-3.5 h-3.5') }}Kırpma elle ayarlandı
+          </span>
+        {% endif %}
+        {% if dusuk %}{{ ui.dusuk_guven_rozeti() }}{% endif %}
+      </div>
+
+      {# Guven gostergesi #}
+      <div class="rounded-xl bg-yuzey/70 p-4">
+        <div class="mb-2 flex items-baseline justify-between">
+          <span class="text-xs font-semibold uppercase tracking-wider text-metin-3">Tanıma güveni</span>
+          <span class="text-sm font-bold tabular-nums {{ 'text-orange-600 dark:text-orange-300' if dusuk else 'text-metin' }}">%{{ yuzde }}</span>
+        </div>
+        <div class="h-2 w-full overflow-hidden rounded-full bg-cizgi" role="meter" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{ yuzde }}" aria-label="Tanıma güveni">
+          <div class="guven-dolgu h-full rounded-full {{ 'bg-orange-500' if dusuk else 'bg-turkuaz-500' }}" style="--deger: {{ yuzde }}%"></div>
+        </div>
+        {% if dusuk %}
+          <p class="mt-2 text-xs text-metin-2">Bu belgenin türünden tam emin olamadık; kontrol edip gerekirse aşağıdan düzeltin.</p>
+        {% endif %}
+      </div>
+
+      {% if belge.aciklama %}
+        <div class="mt-4 flex gap-2.5 text-sm leading-relaxed text-metin-2">
+          <span class="mt-0.5 shrink-0 text-marka-600 dark:text-marka-300">{{ ui.ikon('yildiz', 'w-4 h-4') }}</span>
+          <p>{{ belge.aciklama }}</p>
+        </div>
+      {% endif %}
+
+      <dl class="mt-5 grid grid-cols-2 gap-x-4 gap-y-3 border-t border-cizgi pt-4 text-sm">
+        <div>
+          <dt class="text-xs text-metin-3">Yüklenme</dt>
+          <dd class="font-medium text-metin">{{ ui.zaman(belge.yuklenme_tarihi, 'tam') }}</dd>
+        </div>
+        <div>
+          <dt class="text-xs text-metin-3">Dosya türü</dt>
+          <dd class="font-medium text-metin">{{ 'PDF belgesi' if pdf_mi else belge.mime_type.split('/')[-1] | upper | replace('JPEG', 'JPG') ~ ' görseli' }}</dd>
+        </div>
+        <div>
+          <dt class="text-xs text-metin-3">Belge no</dt>
+          <dd class="font-medium tabular-nums text-metin">#{{ belge.id }}</dd>
+        </div>
+        <div>
+          <dt class="text-xs text-metin-3">Gizlilik</dt>
+          <dd class="inline-flex items-center gap-1 font-medium text-metin">{{ ui.ikon('kalkan', 'w-3.5 h-3.5 text-turkuaz-600') }}Yalnızca siz</dd>
+        </div>
+      </dl>
+    </section>
+
+    {# ------------------------------------------------------------ belge bilgileri
+       Tanimlar alanlar.ALANLAR'dan gelir; bilgiler: sutunlar + alanlar JSONB birlesimi. #}
+    {% set girdi = 'h-10 w-full rounded-xl border border-cizgi bg-kart px-3 text-sm text-metin shadow-kart placeholder:text-metin-3 transition focus:border-marka-500 focus:outline-none focus:ring-4 focus:ring-marka-500/15' %}
+    <section id="bilgiler" class="kart-giris scroll-mt-24 rounded-2xl border border-cizgi bg-kart p-5 shadow-kart sm:p-6" style="--i: 3" aria-labelledby="bilgi-baslik" data-bilgi-karti>
+      <div class="mb-2 flex items-start justify-between gap-3">
+        <div>
+          <h2 id="bilgi-baslik" class="text-sm font-bold text-metin">Belge bilgileri</h2>
+          <p class="mt-0.5 text-xs text-metin-3">
+            {% if belge.alanlar_elle_duzeltildi %}Elle düzenlendi.{% elif belge.alanlar is none %}Bu belgeden henüz bilgi çıkarılmadı; elle girebilirsiniz.{% else %}Otomatik dolduruldu, yanlışsa düzeltin.{% endif %}
+          </p>
+        </div>
+        <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl {{ ui.renk(belge.tur, 'kutu') }}">{{ ui.ikon('yildiz', 'w-[18px] h-[18px]') }}</span>
+      </div>
+
+      <dl class="divide-y divide-cizgi text-sm">
+        {% for anahtar, etiket, tip in alan_tanimlari[belge.tur] %}
+          {% set deger = bilgiler.get(anahtar) %}
+          <div class="flex items-baseline justify-between gap-4 py-2.5">
+            <dt class="shrink-0 text-metin-3">{{ etiket }}</dt>
+            <dd class="min-w-0 break-words text-right font-medium {{ 'text-metin-3' if deger is none else 'text-metin' }}" data-alan="{{ anahtar }}">
+              {%- if deger is none %}—
+              {%- elif tip == 'tarih' %}{{ deger | tarih }}
+              {%- elif tip == 'tutar' %}<span class="tabular-nums">{{ deger | tutar(bilgiler.get('para_birimi')) }}</span>
+              {%- else %}{{ deger }}{% endif -%}
+            </dd>
+          </div>
+        {% endfor %}
+      </dl>
+      {% if belge.tur == 'kimlik' %}
+        <p class="mt-2 flex items-start gap-1.5 text-xs text-metin-3">
+          {{ ui.ikon('kalkan', 'w-3.5 h-3.5 mt-px shrink-0 text-turkuaz-600') }}
+          Gizlilik gereği TC kimlik numarası, doğum tarihi ve seri numarası çıkarılmaz ve saklanmaz.
+        </p>
+      {% endif %}
+
+      <details class="bilgi-duzenle mt-4">
+        <summary class="btn btn-ikincil w-full list-none">{{ ui.ikon('kalem', 'w-4 h-4') }}Bilgileri düzenle</summary>
+        <form action="{{ url_for('alanlari_duzenle', belge_id=belge.id) }}" method="post" class="mt-4 space-y-3">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          {% for anahtar, etiket, tip in alan_tanimlari[belge.tur] %}
+            {% set deger = bilgiler.get(anahtar) %}
+            <label class="block">
+              <span class="mb-1 block text-xs font-semibold text-metin-2">{{ etiket }}</span>
+              {% if tip == 'tarih' %}
+                <input type="date" name="{{ anahtar }}" value="{{ deger | string if deger else '' }}" class="{{ girdi }}">
+              {% elif tip == 'tutar' %}
+                <input type="text" inputmode="decimal" name="{{ anahtar }}" value="{{ deger | tutar if deger is not none else '' }}" placeholder="Örn. 1.250,00" class="{{ girdi }}">
+              {% elif tip == 'para' %}
+                <select name="{{ anahtar }}" class="{{ girdi }}">
+                  <option value="">—</option>
+                  {% for kod in para_birimleri %}<option value="{{ kod }}" {% if kod == deger %}selected{% endif %}>{{ kod }}</option>{% endfor %}
+                  {% if deger and deger not in para_birimleri %}<option value="{{ deger }}" selected>{{ deger }}</option>{% endif %}
+                </select>
+              {% else %}
+                <input type="text" name="{{ anahtar }}" value="{{ deger or '' }}" maxlength="200" class="{{ girdi }}">
+              {% endif %}
+            </label>
+          {% endfor %}
+          <p class="text-xs text-metin-3">Boş bıraktığınız alanlar silinir. Kaydettiğiniz bilgiler toplu bilgi çıkarmada değiştirilmez.</p>
+          <button type="submit" class="btn btn-birincil w-full" data-mesgul-sifirla>{{ ui.ikon('tik', 'w-4 h-4', '2.4') }}Bilgileri kaydet</button>
+        </form>
+      </details>
+    </section>
+
+    {# ------------------------------------------------------------ tur duzeltme #}
+    <section class="kart-giris rounded-2xl border border-cizgi bg-kart p-5 shadow-kart sm:p-6" style="--i: 4" aria-labelledby="tur-baslik">
+      <h2 id="tur-baslik" class="text-sm font-bold text-metin">Belge türünü düzelt</h2>
+      <p class="mb-4 mt-0.5 text-xs text-metin-3">Yanlış sınıflandırıldıysa doğru türü seçip kaydedin.</p>
+      <form action="{{ url_for('turu_degistir', belge_id=belge.id) }}" method="post" data-tur-formu>
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <fieldset>
+          <legend class="sr-only">Belge türü</legend>
+          <div class="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-2">
+            {% for kod, bilgi in turler.items() %}
+              <label class="block cursor-pointer">
+                <input type="radio" name="tur" value="{{ kod }}" class="peer sr-only" {% if kod == belge.tur %}checked{% endif %}>
+                <span class="tur-secenegi relative flex items-center gap-2 rounded-xl border border-cizgi bg-kart px-3 py-2.5 text-sm font-medium text-metin">
+                  <span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-md {{ ui.renk(kod, 'kutu') }}">{{ ui.tur_ikonu(kod, 'w-3.5 h-3.5') }}</span>
+                  <span class="truncate">{{ bilgi.ad }}</span>
+                  <span class="secim-tiki ml-auto text-marka-600 dark:text-marka-300">{{ ui.ikon('tik', 'w-4 h-4', '2.6') }}</span>
+                </span>
+              </label>
+            {% endfor %}
+          </div>
+        </fieldset>
+        <button type="submit" data-kaydet data-mesgul-sifirla class="btn btn-birincil mt-4 w-full">
+          {{ ui.ikon('tik', 'w-4 h-4', '2.4') }}Değişikliği kaydet
+        </button>
+      </form>
+    </section>
+
+    {% endif %}{# not isleniyor #}
+
+    {# ------------------------------------------------------------ islemler #}
+    {% set pdf_modu = gorunum_modu if gorunum_modu in pdf_modlari else 'renkli' %}
+    <section class="kart-giris grid grid-cols-1 gap-2 rounded-2xl border border-cizgi bg-kart p-4 shadow-kart sm:grid-cols-2" style="--i: 5" aria-label="İşlemler">
+      {% if not isleniyor %}
+      {# PDF indir: secili tarama moduyla aranabilir A4 PDF; menude diger modlar. #}
+      <div class="relative flex sm:col-span-2">
+        <a href="{{ url_for('pdf_indir', belge_id=belge.id, mod=pdf_modu) }}" download data-pdf-indir data-indir-bekle
+           class="btn btn-birincil flex-1 {{ '' if pdf_mi else 'rounded-r-none' }}">
+          {{ ui.ikon('dosya-metin', 'w-4 h-4') }}<span>PDF indir{% if not pdf_mi %} <span class="font-medium opacity-80" data-pdf-mod-adi>({{ pdf_modlari[pdf_modu] }})</span>{% endif %}</span>
+        </a>
+        {% if not pdf_mi %}
+          <details class="pdf-menu">
+            <summary class="btn btn-birincil h-full rounded-l-none border-l border-white/25 px-3" aria-label="PDF modunu seç">
+              {{ ui.ikon('sag', 'w-4 h-4 rotate-90') }}
+            </summary>
+            <div class="absolute right-0 z-20 mt-2 w-56 overflow-hidden rounded-xl border border-cizgi bg-kart p-1 shadow-yukselt" role="menu">
+              {% for kod, ad in pdf_modlari.items() %}
+                <a href="{{ url_for('pdf_indir', belge_id=belge.id, mod=kod) }}" download data-indir-bekle role="menuitem"
+                   class="flex items-center justify-between rounded-lg px-3 py-2 text-sm font-medium text-metin hover:bg-yuzey">
+                  {{ ad }}{% if kod == 'sb' %}<span class="text-[11px] text-metin-3">en küçük dosya</span>{% endif %}
+                </a>
+              {% endfor %}
+              <p class="px-3 pb-2 pt-1 text-[11px] leading-snug text-metin-3">Metin seçilebilir ve Ctrl+F ile aranabilir. Siyah-beyazda mühür ve imzalar silik çıkabilir.</p>
+            </div>
+          </details>
+        {% endif %}
+      </div>
+      <a href="{{ url_for('word_indir', belge_id=belge.id) }}" download data-indir-bekle data-bekleme="Word hazırlanıyor…" class="btn btn-ikincil">
+        {{ ui.ikon('dosya-metin', 'w-4 h-4') }}Metni Word olarak indir
+      </a>
+      {% endif %}
+      <a href="{{ url_for('indir', belge_id=belge.id) }}" download class="btn btn-ikincil">
+        {{ ui.ikon('indir', 'w-4 h-4') }}Orijinali indir
+      </a>
+      <form action="{{ url_for('sil', belge_id=belge.id) }}" method="post" data-onay class="sm:col-span-2">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button type="submit" class="btn btn-tehlike w-full">{{ ui.ikon('sil', 'w-4 h-4') }}Sil</button>
+      </form>
+    </section>
+  </div>
+</div>
+
+{# ------------------------------------------------------------ OCR metni #}
+{% if not isleniyor %}
+<section class="kart-giris mt-6 rounded-2xl border border-cizgi bg-kart shadow-kart" style="--i: 6" data-ocr aria-labelledby="ocr-baslik">
+  <div class="flex flex-wrap items-center justify-between gap-3 border-b border-cizgi px-5 py-4 sm:px-6">
+    <div class="flex items-center gap-3">
+      <span class="flex h-9 w-9 items-center justify-center rounded-xl bg-yuzey text-metin-2">{{ ui.ikon('tara', 'w-[18px] h-[18px]') }}</span>
+      <div>
+        <h2 id="ocr-baslik" class="text-sm font-bold text-metin">Belgedeki metin</h2>
+        <p class="text-xs text-metin-3">
+          {% if belge.ocr_metni %}{{ belge.ocr_metni | wordcount }} kelime · {{ belge.ocr_metni | length }} karakter{% else %}Metin bulunamadı{% endif %}
+        </p>
+      </div>
+    </div>
+    {% if belge.ocr_metni %}
+      <button type="button" class="btn btn-ikincil h-9 px-3 text-xs" data-kopyala="ocr-metni">
+        {{ ui.ikon('kopyala', 'w-3.5 h-3.5') }}<span data-kopyala-etiket>Kopyala</span>
+      </button>
+    {% endif %}
+  </div>
+  <div class="px-5 py-4 sm:px-6">
+    {% if belge.ocr_metni %}
+      <div class="ocr-kutu">
+        <pre id="ocr-metni" class="whitespace-pre-wrap break-words font-sans text-sm leading-relaxed text-metin-2">{{ belge.ocr_metni }}</pre>
+      </div>
+      <button type="button" data-ocr-ac aria-expanded="false" aria-controls="ocr-metni"
+              class="mt-3 inline-flex items-center gap-1 text-sm font-semibold text-marka-600 hover:text-marka-700 dark:text-marka-300">
+        <span data-ocr-etiket>Tamamını göster</span>
+        <span class="acilir-ok">{{ ui.ikon('sag', 'w-4 h-4 rotate-90') }}</span>
+      </button>
+    {% else %}
+      <p class="text-sm text-metin-2">Bu belgeden metin okunamadı. Daha net bir fotoğraf yüklemeyi deneyebilirsiniz.</p>
+    {% endif %}
+  </div>
+</section>
+{% endif %}
+{% endblock %}
+
+{% block pencereler %}
+{# ------------------------------------------------------------ tam ekran onizleme #}
+<dialog id="isik-kutusu" class="isik-kutusu" aria-label="Tam ekran önizleme">
+  <div class="flex h-full flex-col">
+    <div class="flex shrink-0 items-center gap-3 px-4 py-3 sm:px-6">
+      <p class="min-w-0 flex-1 truncate text-sm font-semibold text-white/90">{{ belge.dosya_adi }}</p>
+      <button type="button" data-yakinlas aria-pressed="false" title="Yakınlaştır"
+              class="rounded-xl p-2.5 text-white/80 transition hover:bg-white/10 hover:text-white">{{ ui.ikon('yakinlas') }}<span class="sr-only">Yakınlaştır</span></button>
+      <a href="{{ url_for('indir', belge_id=belge.id) }}" download title="İndir"
+         class="rounded-xl p-2.5 text-white/80 transition hover:bg-white/10 hover:text-white">{{ ui.ikon('indir') }}<span class="sr-only">İndir</span></a>
+      <button type="button" data-pencere-kapat title="Kapat (Esc)"
+              class="rounded-xl p-2.5 text-white/80 transition hover:bg-white/10 hover:text-white">{{ ui.ikon('kapat') }}<span class="sr-only">Kapat</span></button>
+    </div>
+    <div class="flex min-h-0 flex-1 items-center justify-center overflow-hidden p-4 pt-0" data-isik-sahne>
+      <img src="{{ gorunum_adresi }}" alt="{{ belge.dosya_adi }}" class="isik-gorsel rounded-lg shadow-2xl" draggable="false">
+    </div>
+  </div>
+</dialog>
+
+{# ------------------------------------------------------------ silme onayi #}
+<dialog id="sil-penceresi" class="pencere" aria-labelledby="sil-baslik">
+  <div class="w-[min(92vw,420px)] rounded-3xl border border-cizgi bg-kart p-6 shadow-yukselt">
+    <span class="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-rose-50 text-rose-600 dark:bg-rose-500/15 dark:text-rose-300">{{ ui.ikon('sil', 'w-6 h-6') }}</span>
+    <h2 id="sil-baslik" class="text-lg font-bold tracking-tight text-metin">Belge silinsin mi?</h2>
+    <p class="mt-1.5 text-sm text-metin-2">
+      <span class="font-semibold text-metin">{{ belge.dosya_adi }}</span> kalıcı olarak silinecek. Bu işlem geri alınamaz.
+    </p>
+    <div class="mt-6 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+      <button type="button" class="btn btn-ikincil" data-pencere-kapat autofocus>Vazgeç</button>
+      <button type="button" class="btn btn-dolu-tehlike" data-onayla data-mesgul-sifirla>{{ ui.ikon('sil', 'w-4 h-4') }}Evet, sil</button>
+    </div>
+  </div>
+</dialog>
+{% endblock %}
