@@ -4,7 +4,7 @@ Diger testler Groq'u taklit eder; bu yuzden anahtarin gecersizlesmesi, modelin
 kaldirilmasi, cevap bicimi degisikligi ya da baglanti sorunlari yakalanmaz.
 Bu dosya gercek istek atar (~7 istek, kota harcar):
 
-    GROQ_ENTEGRASYON=1 pytest tests/test_groq_entegrasyon.py
+    GROQ_ENTEGRASYON=1 pytest -m slow tests/test_groq_entegrasyon.py
 
 .env'deki GROQ_API_KEY (ve varsa GROQ_MODEL) kullanilir; anahtar yazdirilmaz.
 """
@@ -18,10 +18,13 @@ import database
 from conftest import GERCEK_SINIFLANDIR, ocr_gerekli, yukle
 from ornek_gorseller import jpeg_bayt, sayfa
 
-pytestmark = pytest.mark.skipif(
-    os.getenv("GROQ_ENTEGRASYON") != "1" or not os.getenv("GROQ_API_KEY"),
-    reason="Gercek Groq testleri icin GROQ_ENTEGRASYON=1 ve GROQ_API_KEY gerekli",
-)
+pytestmark = [
+    pytest.mark.slow,
+    pytest.mark.skipif(
+        os.getenv("GROQ_ENTEGRASYON") != "1" or not os.getenv("GROQ_API_KEY"),
+        reason="Gercek Groq testleri icin GROQ_ENTEGRASYON=1 ve GROQ_API_KEY gerekli",
+    ),
+]
 
 FATURA = """E-ARŞİV FATURA
 ABC Elektronik Tic. Ltd. Şti.

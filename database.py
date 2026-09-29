@@ -182,10 +182,13 @@ def veritabanini_hazirla():
     """Tablolar ve indeksler yoksa olusturur. Uygulama acilisinda bir kez cagrilir.
 
     Tum komutlar tek seferde gonderilir: uzak veritabaninda her komut ayri bir
-    gidis-donus (~yuzlerce ms) demektir."""
+    gidis-donus (~yuzlerce ms) demektir. Cok komutlu sorgu tek islemde calisir;
+    bastaki kilit ayni anda acilan sureclerin (gunicorn worker, paralel testler)
+    ALTER TABLE'larinin birbirini kilitlemesini (deadlock) onler."""
     ekle = ", ".join(f"ADD COLUMN IF NOT EXISTS {sutun}" for sutun in _EKLENEN_SUTUNLAR)
     _sorgula(
         f"""
+        SELECT pg_advisory_xact_lock(4172026);
         CREATE TABLE IF NOT EXISTS kullanicilar (
             id               SERIAL PRIMARY KEY,
             kullanici_adi    TEXT NOT NULL UNIQUE,
@@ -628,7 +631,7 @@ def koseleri_guncelle(kullanici_id, belge_id, koseler, sifreli_onizleme, ocr_met
     satir = _sorgula(
         "UPDATE belgeler SET koseler = %s, orijinal_saklandi = TRUE, "
         "otomatik_duzeltildi = FALSE, sifreli_onizleme = %s, ocr_metni = %s, "
-        "icerik_surumu = icerik_surumu + 1, isleme_bilgi = isleme_bilgi - 'uyarilar' - 'kirpma_kontrol' "
+        "icerik_surumu = icerik_surumu + 1, isleme_bilgi = isleme_bilgi - 'uyarilar' - 'kirpma_kontrol' - 'taranmis' "
         "WHERE id = %s AND kullanici_id = %s AND mime_type <> 'application/pdf' "
         f"AND (orijinal_saklandi OR NOT otomatik_duzeltildi) AND isleme_durumu = '{TAMAMLANDI}' RETURNING id",
         (

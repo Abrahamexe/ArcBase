@@ -18,6 +18,12 @@ yatay olacak sekilde ince egiklik duzeltmesi koselere katlanir. Belge
 bulunamazsa yalnizca egiklik (±15 derece) duzeltilir; o da olculemezse
 goruntuye dokunulmaz.
 
+Taranmis belgeler (tarayici ciktisi) once ayirt edilir: kenar seritleri duz
+ve acik renkli, arka plan (masa, golge) yok ve perspektif bozulmasi yoksa
+kirpma ve perspektif duzeltmesi hic yapilmaz, yalnizca ±3 derece egiklik
+duzeltilir. Belgenin icindeki bir cerceve ya da tablo kagit kenari sanilmasin
+diye disi da kagit renginde olan aday dortgenler reddedilir.
+
 Duzeltilmis goruntunun orani perspektiften tahmin edilen gercek kagit
 oranidir; A4'e yakinsa tam A4 (kaynak yetiyorsa 300 DPI) uretilir.
 """
@@ -58,6 +64,15 @@ INCE_EGIKLIK = 5.0  # perspektif duzeltmesinden sonra olculen en buyuk egiklik
 MIN_EGIKLIK = 0.3  # bundan kucuk egiklik duzeltilmez (gereksiz yeniden ornekleme)
 PROFIL_UZUN_KENAR = 700  # satir acisi olcumu bu boyutta yapilir
 CIKTI_KALITESI = 95  # OCR'a gidecegi icin yuksek; saklamadan once zaten sikistirilir
+# Taranmis belge algilama
+TARAMA_SERIDI = 0.03  # bakilan kenar seridi (kisa kenara oranla)
+TARAMA_MIN_ACIKLIK = 200.0  # seridin medyan Lab L degeri (0-255) en az bu kadar acik (beyaz/krem kagit)
+TARAMA_MAKS_RENKLILIK = 12.0  # seridin a/b degeri notr renge bu kadar yakin (renkli masa degil)
+TARAMA_DUZLUK = 0.85  # serit piksellerinin en az bu kadari seridin rengine yakin (duz zemin, nesne yok)
+TARAMA_RENK_TOLERANSI = 12.0  # seritler birbirine ve kagida bu kadar yakin (isik azalmasi, arka plan yok)
+TARAMA_PERSPEKTIF_FARKI = 1.0  # yazi satirlarinin acisi sayfanin iki yarisinda bundan fazla farkliysa perspektif var
+TARAMA_MAKS_EGIKLIK = 3.0  # taranmis belgede duzeltilen en buyuk egiklik (derece)
+DIS_KAGIT_BENZERLIGI = 5.0  # kenarin disi icine bu kadar yakinsa (Lab) disarisi da kagittir (icteki cerceve)
 
 
 # ---------------------------------------------------------------- disa acik API
@@ -72,20 +87,81 @@ def goruntu_ac(veri):
 def analiz(bgr):
     """Goruntudeki belgeyi bulur.
 
-    Donus: {"koseler": 4x2 float dizi veya None, "puan": 0-1, "belge": bool}
-    koseler None ise duzeltme gerekmiyor/olculemedi. belge False iken koseler
-    yalnizca egiklik duzeltmesidir (dondurulmus tam goruntu cercevesi).
-    puan belge algilamanin guvenidir; egiklikte 1, hicbir sey yoksa 0.
+    Donus: {"koseler": 4x2 float dizi veya None, "puan": 0-1, "belge": bool,
+    "taranmis": bool}. koseler None ise duzeltme gerekmiyor/olculemedi. belge
+    False iken koseler yalnizca egiklik duzeltmesidir (dondurulmus tam goruntu
+    cercevesi). puan belge algilamanin guvenidir; egiklikte 1, hicbir sey
+    yoksa 0. taranmis: tarayici ciktisi algilandi; kirpilmaz, yalnizca ±3
+    derece egiklik duzeltilir.
     """
+    if taranmis_mi(bgr):
+        return {**_yalnizca_egiklik(bgr, TARAMA_MAKS_EGIKLIK), "taranmis": True}
     koseler, puan = belge_koseleri(bgr)
     if koseler is not None:
-        return {"koseler": _ince_egiklik_kat(bgr, koseler), "puan": puan, "belge": True}
+        return {"koseler": _ince_egiklik_kat(bgr, koseler), "puan": puan, "belge": True, "taranmis": False}
+    return {**_yalnizca_egiklik(bgr, MAKS_EGIKLIK), "taranmis": False}
+
+
+def _yalnizca_egiklik(bgr, sinir):
+    """Belge kirpilmadan yalnizca yazi satirlarinin egikligi duzeltilir. Aci
+    her zaman ±15 derecede olculur; sinirdan buyukse (taranmis belgede 3
+    derece) goruntuye dokunulmaz."""
     aci = egiklik_acisi(bgr)
-    if aci is not None and MIN_EGIKLIK <= abs(aci) <= MAKS_EGIKLIK:
+    if aci is not None and MIN_EGIKLIK <= abs(aci) <= sinir:
         y, g = bgr.shape[:2]
         cerceve = np.float32([[0, 0], [g, 0], [g, y], [0, y]])
         return {"koseler": _dondur(cerceve, aci, icine_sigdir=False, boyut=(y, g)), "puan": 1.0, "belge": False}
     return {"koseler": None, "puan": 0.0, "belge": False}
+
+
+def taranmis_mi(bgr):
+    """Goruntu tarayici ciktisi mi (telefon fotografi degil)?
+
+    Uc kosul birlikte aranir: (1) dort kenar seridi duz ve acik renkli (beyaz
+    ya da krem kagit; nesne, yazi, golge yok), (2) arka plan yok: seritler
+    birbirine ve sayfanin icindeki kagit rengine yakin (masa, isik azalmasi,
+    vinyet yok), (3) perspektif bozulmasi yok: yazi satirlarinin acisi
+    sayfanin ust/alt ve sol/sag yarisinda ayni. Telefonla kagidin tamami
+    kadraji dolduracak sekilde dik cekilmis duzgun isikli fotograf da taranmis
+    sayilir; onda da kirpilacak bir sey yoktur."""
+    if min(bgr.shape[:2]) < MIN_KENAR_PX:
+        return False
+    kucuk, _ = _kucult(bgr)
+    lab = cv2.cvtColor(cv2.GaussianBlur(kucuk, (3, 3), 0), cv2.COLOR_BGR2LAB).astype(np.float32)
+    y, g = lab.shape[:2]
+    s = max(3, int(TARAMA_SERIDI * min(y, g)))
+    kagit = np.median(lab[s:-s, s:-s].reshape(-1, 3), axis=0)
+    renkler = []
+    for serit in (lab[:s], lab[-s:], lab[:, :s], lab[:, -s:]):
+        piksel = serit.reshape(-1, 3)
+        renk = np.median(piksel, axis=0)
+        if renk[0] < TARAMA_MIN_ACIKLIK or np.hypot(renk[1] - 128, renk[2] - 128) > TARAMA_MAKS_RENKLILIK:
+            return False
+        if (np.linalg.norm(piksel - renk, axis=1) < TARAMA_RENK_TOLERANSI).mean() < TARAMA_DUZLUK:
+            return False
+        if np.linalg.norm(renk - kagit) > TARAMA_RENK_TOLERANSI:
+            return False
+        renkler.append(renk)
+    renkler = np.array(renkler)
+    if np.linalg.norm(renkler[:, None] - renkler[None], axis=2).max() > TARAMA_RENK_TOLERANSI:
+        return False
+    # Perspektifte karsilikli yarilardaki satirlar farkli acilarla egilir.
+    yy, gg = bgr.shape[0] // 2, bgr.shape[1] // 2
+    for a, b in ((bgr[:yy], bgr[yy:]), (bgr[:, :gg], bgr[:, gg:])):
+        if not (_yazili(a) and _yazili(b)):
+            continue  # bos yarida olculen aci gurultudur
+        aci_a, aci_b = _satir_acisi(a, MAKS_EGIKLIK), _satir_acisi(b, MAKS_EGIKLIK)
+        if aci_a is not None and aci_b is not None and abs(aci_a - aci_b) > TARAMA_PERSPEKTIF_FARKI:
+            return False
+    return True
+
+
+def _yazili(parca, en_az=0.005):
+    """Parcada satir acisi olculebilecek kadar koyu (murekkep) piksel var mi?
+    Sabit esik: bos kagitta Otsu JPEG gurultusunu yazi sanar."""
+    kucuk, _ = _kucult(parca, PROFIL_UZUN_KENAR)
+    gri = cv2.cvtColor(kucuk, cv2.COLOR_BGR2GRAY) if kucuk.ndim == 3 else kucuk
+    return (gri < 128).mean() >= en_az
 
 
 def uygula(bgr, koseler, uzun_kenar=None):
@@ -203,12 +279,16 @@ def belge_koseleri(bgr):
     kucuk, oran = _kucult(bgr)
     ortam = _ortam(kucuk)
     adaylar = _cizgi_dortgenleri(ortam) + _maske_dortgenleri(kucuk, ortam["boyut"])
+    puanlar = [_dortgen_puani(ortam, dortgen) for dortgen in adaylar]
     en_iyi_puan, en_iyi = 0.0, None
-    for dortgen in adaylar:
-        puan = _dortgen_puani(ortam, dortgen)
-        if puan > en_iyi_puan:
-            en_iyi_puan, en_iyi = puan, dortgen
-    if en_iyi is None or en_iyi_puan < MIN_PUAN:
+    for i in sorted(range(len(adaylar)), key=lambda i: puanlar[i], reverse=True):
+        if puanlar[i] < MIN_PUAN:
+            break
+        # Belgenin icindeki cerceve ya da tablo: disi da kagit, kagit kenari degil.
+        if not _disi_kagit_mi(ortam, adaylar[i]):
+            en_iyi_puan, en_iyi = puanlar[i], adaylar[i]
+            break
+    if en_iyi is None:
         return None, en_iyi_puan
     if _karsitlik(ortam["lab"], en_iyi) < MIN_KARSITLIK:
         return None, en_iyi_puan
@@ -312,6 +392,47 @@ def _kenar_destegi(ic, dis, kagit):
         & (_kagit_uzakligi(ic, kagit) < KAGIT_TOLERANSI)
         & ((ic[:, 0] > dis[:, 0] + KONTRAST_ESIGI / 2) | (dis_ab > ic_ab + KONTRAST_ESIGI / 2))
     )
+
+
+def _disi_kagit_mi(ortam, dortgen):
+    """Dortgenin disi da kagit mi (belgenin icindeki cerceve ya da tablo)?
+
+    Koyu bir cerceve cizgisi kontrast puanini kagit kenari kadar destekler
+    (ic yani kagit, cizginin kendisi koyu). Bu yuzden her kenarin iki yanina,
+    cizginin otesinde birkac kat uzaktan bakilir: gercek kagit kenarinin disi
+    masa/zemindir; icteki cercevenin disi ise yine ayni kagittir. Disi kadrajda
+    gorunen kenarlardan en az ucunde dis taraf ic tarafla (ya da dortgenin
+    kagit rengiyle; ic taraf tablonun gri baslik satiri olabilir) ayni
+    renkteyse dortgen kagit kenari sayilmaz."""
+    lab, ofset, kayma = ortam["lab"], ortam["ofset"], ortam["kayma"]
+    kagit = _kagit_rengi(lab, dortgen)
+    merkez = dortgen.mean(axis=0)
+    kagit_disli = 0
+    for i in range(4):
+        a, b = dortgen[i], dortgen[(i + 1) % 4]
+        uzunluk = float(np.linalg.norm(b - a))
+        if uzunluk < 1:
+            continue
+        yon = (b - a) / uzunluk
+        normal = np.array([-yon[1], yon[0]], np.float32)
+        if np.dot(merkez - a, normal) < 0:
+            normal = -normal  # iceriyi gosteren normal
+        noktalar = a + np.linspace(0.1, 0.9, max(10, int(uzunluk / 4)))[:, None] * (b - a)
+        ic_renk, dis_renk = [], []
+        for uzaklik in np.linspace(kayma + 2 * ofset, kayma + 6 * ofset, 3):
+            ic, ic_gorunur = _ornekle(lab, noktalar + normal * uzaklik)
+            dis, dis_gorunur = _ornekle(lab, noktalar - normal * uzaklik)
+            burada = ic_gorunur & dis_gorunur
+            ic_renk.append(ic[burada])
+            dis_renk.append(dis[burada])
+        ic_renk, dis_renk = np.concatenate(ic_renk), np.concatenate(dis_renk)
+        if len(dis_renk) < 0.3 * 3 * len(noktalar):
+            continue  # disi kadrajda gorunmuyor: karar verilemez
+        dis = np.median(dis_renk, axis=0)
+        fark = min(np.linalg.norm(np.median(ic_renk, axis=0) - dis), np.linalg.norm(kagit - dis))
+        if fark < DIS_KAGIT_BENZERLIGI:
+            kagit_disli += 1
+    return kagit_disli >= 3
 
 
 def _kagit_rengi(lab, dortgen):

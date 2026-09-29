@@ -13,7 +13,9 @@ Kullanim (proje kokunden):
     python docs/hiz_olcumu.py --karsilastir once.json sonra.json        # tablo
 
 --kok: olculecek kod dizini (varsayilan: bu proje). .env her durumda bu
-projeden okunur; anahtarlar yazdirilmaz. Gercek Groq cagrisi yapilir
+projeden okunur; anahtarlar yazdirilmaz. Testlerdeki gibi yalnizca
+TEST_DATABASE_URL kullanilir (tests/db_korumasi.py): tanimli degilse ya da
+canli veritabaniyla (DATABASE_URL) ayniysa olcum baslamaz. Gercek Groq cagrisi yapilir
 (GROQ_API_KEY varsa); --sahte-groq ile Groq aninda cevap veren taklitle
 degistirilir.
 """
@@ -482,6 +484,16 @@ def main():
     from dotenv import load_dotenv
 
     load_dotenv(PROJE / ".env")
+    # Olculen kod ice aktarilmadan once: DATABASE_URL test adresi olur (canli asla).
+    sys.path.insert(0, str(PROJE / "tests"))
+    from db_korumasi import CanliVeritabaniHatasi, veritabanini_ayarla
+
+    try:
+        if not veritabanini_ayarla():
+            sys.exit("TEST_DATABASE_URL tanımlı değil: ölçüm canlı veritabanında yapılmaz. "
+                     ".env'e ayrı bir test veritabanı adresi ekleyin.")
+    except CanliVeritabaniHatasi as hata:
+        sys.exit(str(hata))
     os.environ.setdefault("ARKA_PLAN_ISCISI", "0")  # yeni surumde isler olcum icin elle calistirilir
     kok = Path(arg.kok).resolve()
     sys.path.insert(0, str(kok))

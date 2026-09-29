@@ -26,6 +26,7 @@ from ornek_gorseller import (
 )
 
 
+@pytest.mark.slow
 @ocr_gerekli
 def test_zor_fotograf_yuklemeden_aranabilir_pdfe(girisli):
     """Sari isikli, golgeli, ~30 derece yamuk, acik renkli masada cekilmis,
@@ -73,6 +74,7 @@ def _eski(kullanici_id, surum):
     ), veri
 
 
+@pytest.mark.slow
 @ocr_gerekli
 @pytest.mark.parametrize("surum", ["v3", "v4-duzeltilmis"])
 def test_eski_belgeler_tum_yeni_yollarda_acilir(girisli, surum):

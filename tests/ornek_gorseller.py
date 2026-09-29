@@ -80,6 +80,40 @@ def egik_tarama(aci=7.0):
     return cv2.warpAffine(kagit, matris, (g, h), borderValue=(255, 255, 255))
 
 
+def tarayici_ciktisi(kagit=None, tohum=7):
+    """Tarayici ciktisi: kagit goruntunun tamamini kaplar, kenarda masa ya da
+    golge yok; hafif krem kagit tonu ve sensor gurultusu."""
+    rng = np.random.default_rng(tohum)
+    kagit = sayfa() if kagit is None else kagit
+    ton = np.array([250, 248, 243], np.float32)
+    sonuc = kagit.astype(np.float32) / 255 * ton + rng.normal(0, 2, kagit.shape)
+    return sonuc.clip(0, 255).astype(np.uint8)
+
+
+def cerceveli_tablo(boyut=(1240, 1754)):
+    """Sayfanin neredeyse tamamini kaplayan kalin cerceveli tablo: cerceve,
+    koyu masadaki kagidin kenari gibi guclu ve duz bir dortgendir."""
+    g, y = boyut
+    gorsel = Image.new("RGB", boyut, "white")
+    d = ImageDraw.Draw(gorsel)
+    d.text((int(g * 0.08), int(y * 0.05)), "HESAP OZETI 2026", fill="black", font=_yazi_tipi(g // 20))
+    sol, ust, sag, alt = int(g * 0.07), int(y * 0.14), int(g * 0.93), int(y * 0.90)
+    satir = (alt - ust) / 12
+    d.rectangle((sol, ust, sag, int(ust + satir)), fill=(225, 225, 225))  # baslik satiri
+    sutunlar = [sol, int(sol + (sag - sol) * 0.45), int(sol + (sag - sol) * 0.72), sag]
+    yazi = _yazi_tipi(g // 34)
+    for i in range(1, 12):
+        d.line((sol, int(ust + i * satir), sag, int(ust + i * satir)), fill="black", width=2)
+    for x in sutunlar[1:-1]:
+        d.line((x, ust, x, alt), fill="black", width=2)
+    for i in range(12):
+        hucreler = ("Aciklama", "Tarih", "Tutar") if i == 0 else (f"Kalem {i}", f"{i:02}.03.2026", f"{i * 125},00 TL")
+        for x, metin in zip(sutunlar, hucreler):
+            d.text((x + 12, int(ust + i * satir + satir * 0.3)), metin, fill="black", font=yazi)
+    d.rectangle((sol, ust, sag, alt), outline="black", width=max(4, g // 200))  # kalin dis cerceve
+    return np.asarray(gorsel)
+
+
 def jpeg_bayt(rgb, kalite=92):
     tampon = io.BytesIO()
     Image.fromarray(rgb).save(tampon, "JPEG", quality=kalite)

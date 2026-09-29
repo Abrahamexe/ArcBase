@@ -161,11 +161,14 @@ def _goruntu_asamasi(is_, bilgi):
     # Telefon fotografinda belgenin koseleri bulunur. Saklanan, duzeltilmemis
     # (kucultulmus) orijinal + koselerdir; duzeltilmis hal gosterimde aninda
     # uretilir. Kose puani emin esiginin altindaysa arayuz kirpmayi kontrol ettirir.
+    # Taranmis belge kirpilmaz (yalnizca kucuk egiklik); belge sayfasinda rozet cikar.
     koseler = None
     if bilgi.get("duzelt", True):
         analiz = goruntu_duzelt.analiz(tam)
         koseler = analiz["koseler"]
-        if koseler is not None and analiz["belge"]:
+        if analiz["taranmis"]:
+            bilgi["taranmis"] = True
+        elif koseler is not None and analiz["belge"]:
             bilgi["kirpma_kontrol"] = analiz["puan"] < goruntu_duzelt.EMIN_PUANI
     duz, gri = ocr_girdisi(tam, koseler)
     metin = _metin_oku(gri, "image/jpeg", uyarilar)

@@ -19,6 +19,8 @@ from conftest import SIFRE, belge_ekle, jpeg
 
 playwright_api = pytest.importorskip("playwright.sync_api")
 
+pytestmark = pytest.mark.slow
+
 
 @pytest.fixture
 def sunucu(uygulama, monkeypatch):

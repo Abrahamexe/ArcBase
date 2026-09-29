@@ -31,6 +31,7 @@ def belge_id(yanit):
 
 # ---------------------------------------------------------------- yukleme + OCR
 
+@pytest.mark.slow
 @ocr_gerekli
 def test_gorsel_yukleme_ocr_ve_siniflandirma(girisli):
     c, k = girisli
@@ -43,6 +44,7 @@ def test_gorsel_yukleme_ocr_ve_siniflandirma(girisli):
     assert "fatura.jpg" in sayfa and "Fatura No" in sayfa
 
 
+@pytest.mark.slow
 @ocr_gerekli
 def test_pdf_yukleme_oldugu_gibi_saklanir(girisli):
     import pymupdf

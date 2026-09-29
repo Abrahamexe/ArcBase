@@ -12,7 +12,7 @@ import database
 from conftest import ocr_gerekli
 from ornek_gorseller import SATIRLAR, isik_bozulmasi, jpeg_bayt, masada_egik_cekim, renkli_belge, sayfa
 
-pytestmark = ocr_gerekli
+pytestmark = [ocr_gerekli, pytest.mark.slow]  # metin katmani gercek Tesseract'la uretilir
 
 
 def _gorsel_belge(kullanici_id, gorsel, **ek):

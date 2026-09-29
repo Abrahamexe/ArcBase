@@ -235,6 +235,20 @@
             {{ ui.ikon('kirp', 'w-3.5 h-3.5') }}Kırpma elle ayarlandı
           </span>
         {% endif %}
+        {% if taranmis %}
+          {# Tarayici ciktisi algilandi; yanlissa kose editoruyle elle kirpilabilir. #}
+          {% set rozet_sinifi = "inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ring-inset bg-yuzey text-metin-2 ring-cizgi" %}
+          {% if kose_ayarlanabilir %}
+            <a href="{{ url_for('belge', belge_id=belge.id, koseler=1) }}" class="{{ rozet_sinifi }}" data-taranmis-rozeti
+               title="Tarayıcı çıktısı algılandı, kâğıt kırpılmadı. Yanlışsa köşeleri elle ayarlayabilirsiniz.">
+              {{ ui.ikon('tara', 'w-3.5 h-3.5') }}Taranmış belge, kırpma uygulanmadı
+            </a>
+          {% else %}
+            <span class="{{ rozet_sinifi }}" data-taranmis-rozeti title="Tarayıcı çıktısı algılandı, kâğıt kırpılmadı.">
+              {{ ui.ikon('tara', 'w-3.5 h-3.5') }}Taranmış belge, kırpma uygulanmadı
+            </span>
+          {% endif %}
+        {% endif %}
         {% if dusuk %}{{ ui.dusuk_guven_rozeti() }}{% endif %}
       </div>
 

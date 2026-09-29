@@ -1,6 +1,9 @@
 """Test ortak parcalari.
 
-Testler .env'deki DATABASE_URL'i (veya varsa TEST_DATABASE_URL'i) kullanir.
+Testler yalnizca .env'deki TEST_DATABASE_URL'i kullanir; DATABASE_URL'e (canli
+veritabani) hicbir kosulda baglanmaz (db_korumasi.py). TEST_DATABASE_URL
+tanimli degilse veritabani gerektiren testler uyariyla atlanir; canli
+veritabaniyla ayniysa test oturumu hatayla durur.
 Her test benzersiz adli gecici kullanicilar olusturur ve sonunda siler;
 belgeleri ON DELETE CASCADE ile birlikte silinir. Groq cagrilari varsayilan
 olarak taklit edilir (kota harcanmaz, sonuc tekrarlanabilir olur).
@@ -24,10 +27,21 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from dotenv import load_dotenv  # noqa: E402
 
+from db_korumasi import CanliVeritabaniHatasi, veritabanini_ayarla  # noqa: E402
+
 load_dotenv()
 os.environ["ARKA_PLAN_ISCISI"] = "0"
-if os.getenv("TEST_DATABASE_URL"):
-    os.environ["DATABASE_URL"] = os.environ["TEST_DATABASE_URL"]
+# Uygulama modullerinden ONCE: DATABASE_URL test adresi olur ya da bos kalir.
+try:
+    TEST_VERITABANI = veritabanini_ayarla()
+    VERITABANI_HATASI = None
+except CanliVeritabaniHatasi as hata:
+    TEST_VERITABANI, VERITABANI_HATASI = None, str(hata)
+
+VERITABANI_YOK = (
+    "TEST_DATABASE_URL tanımlı değil: veritabanı gerektiren testler atlandı "
+    "(.env'e ayrı bir test veritabanı adresi ekleyin; DATABASE_URL testlerde kullanılmaz)."
+)
 
 from PIL import Image, ImageDraw, ImageFont  # noqa: E402
 
@@ -57,21 +71,43 @@ def tesseract_var():
 ocr_gerekli = pytest.mark.skipif(not tesseract_var(), reason="Tesseract kurulu değil")
 
 
+def pytest_configure(config):
+    if VERITABANI_HATASI:
+        raise pytest.UsageError(VERITABANI_HATASI)
+
+
+def pytest_report_header(config):
+    return None if TEST_VERITABANI else "UYARI: " + VERITABANI_YOK
+
+
+def pytest_terminal_summary(terminalreporter):
+    if not TEST_VERITABANI:
+        terminalreporter.write_line("UYARI: " + VERITABANI_YOK, yellow=True, bold=True)
+
+
 @pytest.fixture(scope="session")
-def uygulama():
+def veritabani():
+    """Veritabani gerektiren her sey buna baglidir: TEST_DATABASE_URL yoksa atlanir."""
+    if not TEST_VERITABANI:
+        pytest.skip(VERITABANI_YOK)
+    database.veritabanini_hazirla()
+
+
+@pytest.fixture(scope="session")
+def uygulama(veritabani):
     app = uygulama_modulu.app
     app.config.update(TESTING=True, WTF_CSRF_ENABLED=False)
-    database.veritabanini_hazirla()
     return app
 
 
 @pytest.fixture(autouse=True)
-def _temiz_durum(uygulama, monkeypatch):
-    """Her testte hiz siniri kapali ve sifirlanmis, CSRF kapali baslar."""
+def _temiz_durum(monkeypatch):
+    """Her testte hiz siniri kapali ve sifirlanmis, CSRF kapali baslar.
+    Veritabanina baglanmaz: saf goruntu testleri veritabanisiz da calisir."""
     limiter = uygulama_modulu.limiter
     limiter.reset()
     limiter.enabled = False
-    uygulama.config["WTF_CSRF_ENABLED"] = False
+    uygulama_modulu.app.config["WTF_CSRF_ENABLED"] = False
     yield
     limiter.enabled = True
     limiter.reset()
@@ -83,7 +119,7 @@ def istemci(uygulama):
 
 
 @pytest.fixture
-def yeni_ad():
+def yeni_ad(veritabani):
     """Benzersiz, kurallara uygun bir kullanici adi uretir ve test sonunda
     bu adla olusturulan kullaniciyi (varsa) siler."""
     adlar = []

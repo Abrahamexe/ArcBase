@@ -677,6 +677,8 @@ def belge(belge_id):
         # belge yeniden analiz edilene kadar gosterilir.
         isleme_uyarilari=[] if kayit["elle_duzeltildi"] else bilgi.get("uyarilar") or [],
         kirpma_kontrol=bool(bilgi.get("kirpma_kontrol")),
+        # Tarayici ciktisi algilandi, kirpilmadi (koseler elle kaydedilince kalkar).
+        taranmis=bool(bilgi.get("taranmis")),
     )
 
 
@@ -883,6 +885,7 @@ def koseleri_algila(belge_id):
     return {
         "koseler": None if koseler is None else [[round(float(x), 1), round(float(y), 1)] for x, y in koseler],
         "belge": sonuc["belge"],
+        "taranmis": sonuc["taranmis"],
         "puan": round(sonuc["puan"], 2),
     }
 

@@ -30,6 +30,10 @@ Her kullanıcı kayıt olup giriş yapar ve **yalnızca kendi belgelerini** gör
 - **Güçlü yamukluk düzeltme (v5):** Dört farklı yöntemle köşe adayları üretilip puanlanır (beyaz masada beyaz
   kâğıt dahil), yazı satırları tam yatay olacak şekilde ince eğiklik düzeltilir; **köşeler elle ayarlanabilir**
   (fare/dokunmatik, büyüteç). Emin olunamayan kırpmalarda "Kırpmayı kontrol et" önerilir
+- **Taranmış belge algılama:** Tarayıcı çıktısı JPG/PNG'ler (kenarları düz beyaz, arka plan ve perspektif
+  yok) otomatik tanınır; kırpma ve perspektif düzeltmesi yapılmaz, yalnızca ±3° eğiklik düzeltilir ve belge
+  sayfasında **"Taranmış belge, kırpma uygulanmadı"** rozeti gösterilir. Belgenin içindeki çerçeve veya
+  tablo hiçbir zaman kâğıt kenarı sanılıp kırpılmaz
 - **Aranabilir A4 PDF (v5):** Görünmez metin katmanlı; metin seçilebilir ve Ctrl+F ile aranabilir. Seçilen
   belgeler **tek PDF'te birleştirilebilir** (yer imleriyle, en fazla 20 belge)
 - **Word'e aktarma (v5):** Belge bilgileri tablosu ve okunan metin `.docx` olarak indirilir
@@ -240,6 +244,13 @@ ayırıcıyla karşılaştırır.
 
 `goruntu_duzelt.py` tüm geometrik düzeltmeyi **dört köşeyle** ifade eder:
 
+0. **Taranmış belge kontrolü:** Görüntünün dört kenar şeridi düz ve açık renkliyse (beyaz/krem kâğıt; masa,
+   gölge, nesne yok), şeritler birbirine ve sayfanın içindeki kâğıt rengine yakınsa (ışık azalması, arka plan
+   yok) ve yazı satırlarının açısı sayfanın üst/alt ve sol/sağ yarısında aynıysa (perspektif yok) görüntü
+   **taranmış belge** sayılır: kırpma ve perspektif düzeltmesi yapılmaz, "Kırpmayı kontrol et" önerilmez,
+   yalnızca ±3°'ye kadar eğiklik düzeltilir. Belge sayfasında "Taranmış belge, kırpma uygulanmadı" rozeti
+   çıkar; algılama yanlışsa rozetten köşe düzenleyici açılıp elle kırpılabilir (elle kaydedilince rozet
+   kalkar). "Otomatik kırp ve düzelt" anahtarı (varsayılan açık) düzeltmeyi tamamen kapatmak için kalır
 1. **Aday üretimi** (küçültülmüş kopyada):
    - **Kenar çizgileri:** Lab kanallarında Canny + `HoughLinesP`; aynı doğru üzerindeki parçalar birleştirilir.
      Her yönde (yatay/dikey) en çok desteklenen 10 çizgi ve görüntünün kendi kenarları eşleştirilip dörtgenler
@@ -250,13 +261,15 @@ ayırıcıyla karşılaştırır.
    ondan belirgin şekilde farklı (daha koyu ya da renkçe uzak) mı? Kâğıtla aynı renkteki **beyaz duvar veya
    parlak masa yansıması** bu ölçüte takılır; yazı satırı (iç taraf mürekkep) ve kâğıt dışındaki masa/laptop
    sınırı (iç taraf ahşap) kenar sayılmaz. Hafif kavisli kâğıt için gerçek kenarın çizgiye birkaç piksel yakın
-   olması yeterlidir. Kadrajda görünmeyen (**görüntü kenarına dayanan**) kenar destek almaz. Seçilen dörtgenin
-   kenarları yakındaki Canny piksellerine yeniden oturtulur
+   olması yeterlidir. Kadrajda görünmeyen (**görüntü kenarına dayanan**) kenar destek almaz. **Çerçeve/tablo
+   koruması:** koyu bir çerçeve çizgisi de bu ölçüte uyar; bu yüzden her kenarın iki yanına çizginin birkaç kat
+   ötesinden bakılır — dışı en az üç kenarda da kâğıt renginde olan dörtgen (belgenin içindeki çerçeve ya da
+   tablo) reddedilir. Seçilen dörtgenin kenarları yakındaki Canny piksellerine yeniden oturtulur
 3. **Güven:** puan kenar desteklerinin ortalamasıdır; zayıf bir kenar varsa puan 0,8'in altında kalır ve toplu
    yükleme listesinde ve belge sayfasında **"Kırpmayı kontrol et"** bağlantısı çıkar (köşeler elle
    kaydedilince kalkar); iki zayıf kenarlı dörtgen belge sayılmaz
 4. **İnce eğiklik:** perspektif düzeltmesinden sonra yazı satırlarının açısı izdüşüm profiliyle ölçülür
-   (±5°) ve köşelere katlanır; belge bulunamazsa aynı yöntemle ±15° eğiklik düzeltilir
+   (±5°) ve köşelere katlanır; belge bulunamazsa aynı yöntemle ±15° (taranmış belgede ±3°) eğiklik düzeltilir
 5. **Boyut:** kâğıdın gerçek en-boy oranı perspektiften tahmin edilir (Zhang–He; kameraya eğik tutulan kâğıt
    fotoğrafta basık görünür). Dörtgen makul bir telefon odağıyla (uzun kenarın 0,55–1,6 katı) A4 olabiliyorsa
    (±%5) tam A4 üretilir: kaynak yetiyorsa **300 DPI (2480×3508)**, çok küçük fotoğrafta en az 150 DPI.
@@ -437,6 +450,7 @@ pip install -r requirements.txt
 |---|---|
 | `GROQ_API_KEY` | Groq konsolundan alınan API anahtarı |
 | `DATABASE_URL` | `postgresql://kullanici:sifre@host/veritabani?sslmode=require` biçiminde bağlantı adresi |
+| `TEST_DATABASE_URL` | Testler ve `docs/hiz_olcumu.py` için **ayrı** bir veritabanı (aynı biçim); `DATABASE_URL` ile aynı olamaz |
 | `ENCRYPTION_KEY` | `python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"` |
 | `SECRET_KEY` | `python -c "import secrets; print(secrets.token_hex(32))"` |
 | `GROQ_MODEL` | Opsiyonel, varsayılan `openai/gpt-oss-120b` |
@@ -474,18 +488,28 @@ tailwindcss -c tailwind.config.js -i static/tailwind.giris.css -o static/tailwin
 ```bash
 pip install -r requirements-dev.txt
 playwright install chromium      # tarayıcı testleri için (opsiyonel)
-pytest
+
+pytest                                    # hızlı: yavaş testler atlanır
+pytest -m "slow or not slow"              # tam paket (Playwright, gerçek OCR, uçtan uca dahil)
+pytest -n auto                            # hızlı paket, paralel (pytest-xdist)
+pytest -m "slow or not slow" -n auto      # tam paket, paralel
 ```
 
-Testler `.env`'deki veritabanını (tanımlıysa `TEST_DATABASE_URL`'i) kullanır; benzersiz adlı geçici
-kullanıcılar oluşturup sonunda siler. Testlerde arka plan işçisi kendiliğinden başlamaz; yüklenen belgenin
-işi test içinde hemen çalıştırılır ve yalnızca o belge işlenir (canlı veritabanıyla paylaşılıyorsa bile
-başka belgelere dokunulmaz — yine de ayrı bir `TEST_DATABASE_URL` önerilir). Groq çağrıları taklit edilir. Taklit, anahtarın geçersizleşmesi,
+Yavaş testler (Playwright tarayıcı testleri, gerçek Tesseract OCR, gerçek Groq, uzun uçtan uca testler)
+`@pytest.mark.slow` ile işaretlidir ve `pytest.ini`'deki `-m "not slow"` ayarıyla varsayılan çalıştırmada
+atlanır.
+
+**Test veritabanı:** Testler yalnızca `.env`'deki **`TEST_DATABASE_URL`**'i kullanır; canlı veritabanına
+(`DATABASE_URL`) hiçbir koşulda bağlanmaz. `TEST_DATABASE_URL` tanımlı değilse veritabanı gerektiren testler
+açık bir uyarıyla atlanır (saf görüntü/tarama testleri yine çalışır); `DATABASE_URL` ile aynıysa test oturumu
+hata verip durur. `docs/hiz_olcumu.py` da aynı kurala uyar. Testler benzersiz adlı geçici kullanıcılar
+oluşturup sonunda siler. Testlerde arka plan işçisi kendiliğinden başlamaz; yüklenen belgenin işi test
+içinde hemen çalıştırılır ve yalnızca o belge işlenir. Groq çağrıları taklit edilir. Taklit, anahtarın geçersizleşmesi,
 modelin kaldırılması ya da bağlantı sorunları gibi gerçek hataları yakalayamaz; bunlar için gerçek Groq'a
 istek atan entegrasyon testlerini (~7 istek) ayrıca çalıştırın:
 
 ```bash
-GROQ_ENTEGRASYON=1 pytest tests/test_groq_entegrasyon.py
+GROQ_ENTEGRASYON=1 pytest -m slow tests/test_groq_entegrasyon.py
 ```
 
 (Tüm paketi gerçek Groq ile çalıştırmak için `GERCEK_GROQ=1 pytest`; çok daha fazla istek harcar.) OCR testleri Tesseract, tarayıcı testleri (`tests/test_arayuz.py`) Chromium kurulu
@@ -498,7 +522,7 @@ değilse atlanır.
 | `test_arka_plan.py` | Yüklemenin hemen dönmesi ve "İşleniyor" rozeti, JS kapalıyken yenilenen sayfa, yarım kalan işin yeniden alınması, kaldığı aşamadan devam (OCR tekrarlanmaz), bellek boşalınca saklanan görselden OCR, çökme döngüsü → hata → "Yeniden işle", işlenirken elle seçilen tür, durumun kullanıcıya özel olması, gerçek işçi iş parçacığı |
 | `test_hiz.py` | Sayfa başına sorgu sayısı ve havuzdan bağlantı, kopmuş bağlantının yenilenmesi, ETag/304 ve bellek önbelleği, köşe/mod değişince önbelleğin geçersizleşmesi, sürümlü adres, önbelleğin başka kullanıcıya belge vermemesi, grid'de lazy önizleme, tek OCR ve küçültülmüş girdi, paralel PDF OCR, derlenmiş CSS, ≤200 ms animasyonlar |
 | `test_tarama.py` | Gölge/sarı ışık temizliği, renk korunumu (mavi mürekkep, kırmızı mühür, logo), gri/siyah-beyaz, gürültü, hız, `/tarama` route'u |
-| `test_duzelt.py` | Çoklu aday algılama (15–30°, beyaz masa, mühürlü belge), ince eğiklik, kadrajdan taşan kâğıt, orijinal + köşe saklama, eski v3/v4 belgeleri, EXIF |
+| `test_duzelt.py` | Çoklu aday algılama (15–30°, beyaz masa, mühürlü belge), ince eğiklik, kadrajdan taşan kâğıt, taranmış belge algılama (kırpılmaz, ±3° eğiklik, rozet; büyük çerçeveli tablo kâğıt kenarı sanılmaz), orijinal + köşe saklama, eski v3/v4 belgeleri, EXIF |
 | `test_koseler.py` | Elle köşe ayarlama, yeniden OCR, otomatik yeniden algılama, yeniden analiz (elle düzeltilenler korunur), eski belgelerde kapalı olması |
 | `test_pdf.py` | PDF'te metin arama, A4 yerleşimi (dikey/yatay, eşit kenar), boyut, meta veri, birleştirme sırası ve yer imleri, 20 belge sınırı |
 | `test_word.py` | Başlık, bilgi tablosu, not satırı, OCR paragrafları |

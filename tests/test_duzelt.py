@@ -18,12 +18,14 @@ from conftest import bayt, gorsel_boyutu, isleme_durumu, jpeg, ocr_gerekli, yazi
 from ornek_gorseller import (
     COK_EGIK,
     HAFIF_EGIK,
+    cerceveli_tablo,
     egik_tarama,
     isik_bozulmasi,
     jpeg_bayt,
     masada_egik_cekim,
     renkli_belge,
     sayfa,
+    tarayici_ciktisi,
 )
 
 
@@ -43,12 +45,19 @@ def test_masadaki_belge_kirpilip_duzeltilir():
     assert 0.6 < g / y < 0.95  # dikey sayfa
 
 
-@pytest.mark.parametrize("aci", [-9, -4, 3, 7, 12])
+@pytest.mark.parametrize("aci", [-2.5, -1.5, 1.5, 2.5])
 def test_egik_tarama_duzeltilir(aci):
+    """Taranmis belgede yalnizca kucuk (±3 derece) egiklik duzeltilir."""
     veri = jpeg_bayt(egik_tarama(aci))
     yeni, uygulandi = goruntu_duzelt.duzelt(veri)
     assert uygulandi
     assert abs(goruntu_duzelt.egiklik_acisi(_bgr(yeni))) < abs(aci) / 2
+
+
+@pytest.mark.parametrize("aci", [-9, 7, 12])
+def test_taranmis_belgede_buyuk_egiklik_duzeltilmez(aci):
+    a = goruntu_duzelt.analiz(_bgr(jpeg_bayt(egik_tarama(aci))))
+    assert a["taranmis"] and a["koseler"] is None
 
 
 @pytest.mark.parametrize(
@@ -126,6 +135,7 @@ def test_pdf_duzeltilmez(girisli, monkeypatch):
     assert "Otomatik düzeltildi" not in c.get(r.headers["Location"]).get_data(as_text=True)
 
 
+@pytest.mark.slow
 @ocr_gerekli
 def test_duzeltme_ocr_sonucunu_bozmaz():
     """Duz, metinli gorselde duzeltme devreye girmez; OCR ayni kalir."""
@@ -134,6 +144,7 @@ def test_duzeltme_ocr_sonucunu_bozmaz():
     assert not uygulandi and yeni == veri
 
 
+@pytest.mark.slow
 @ocr_gerekli
 def test_duzeltme_oncesi_sonrasi_ocr_karsilastirmasi():
     """~30 derece donuk, masada cekilmis fotograf: duzeltmeden once Tesseract
@@ -304,11 +315,71 @@ def test_gercek_fotograf_elle_kose_vermeden_kirpilir():
     fotograf uzerinde elle olculdu."""
     bgr = cv2.imread(str(OZEL_FOTO))
     a = goruntu_duzelt.analiz(bgr)
+    assert not a["taranmis"]  # sagdaki beyaz zemine ragmen telefon fotografi
     assert a["belge"] and a["puan"] >= goruntu_duzelt.EMIN_PUANI
     elle = np.float32([[76, 84], [475, 75], [579, 726], [-17, 726]])
     assert np.abs(a["koseler"] - elle).max() < 0.02 * np.hypot(*bgr.shape[:2])
     y, g = goruntu_duzelt.uygula(bgr, a["koseler"]).shape[:2]
     assert (g, y) == goruntu_duzelt.A4_150DPI
+
+
+# ---------------------------------------------------------------- taranmis belge korumasi
+
+TARANMISLAR = {
+    "duz": lambda: tarayici_ciktisi(),  # kenarinda masa olmayan taranmis belge
+    "cerceveli-tablo": lambda: tarayici_ciktisi(cerceveli_tablo()),
+}
+
+
+@pytest.mark.parametrize("ad", TARANMISLAR)
+def test_taranmis_belge_algilanir_kirpilmaz(ad):
+    a = goruntu_duzelt.analiz(_bgr(jpeg_bayt(TARANMISLAR[ad]())))
+    assert a["taranmis"] and not a["belge"] and a["koseler"] is None
+
+
+@pytest.mark.parametrize(
+    "ayar",
+    [dict(koseler=DIK_15), dict(koseler=HAFIF_EGIK, zemin_tonu=240), dict(koseler=COK_EGIK, zemin_tonu=245)],
+    ids=["koyu-masa", "beyaz-masa", "beyaz-masa-30-derece"],
+)
+def test_telefon_fotografi_taranmis_sayilmaz(ayar):
+    assert not goruntu_duzelt.taranmis_mi(_bgr(jpeg_bayt(masada_egik_cekim(**ayar))))
+
+
+def test_icteki_cerceve_kagit_kenari_sanilmaz():
+    """Taranmis belge algilamasindan bagimsiz: cercevenin disi da kagit
+    oldugu icin tablo cercevesi kirpma adayi olarak reddedilir."""
+    bgr = _bgr(jpeg_bayt(tarayici_ciktisi(cerceveli_tablo())))
+    assert goruntu_duzelt.belge_koseleri(bgr)[0] is None
+
+
+def test_masadaki_cerceveli_tablo_kagit_kenarindan_kirpilir():
+    """Koyu masadaki tablolu kagit: tablo cercevesi degil kagidin kenari secilir."""
+    a = goruntu_duzelt.analiz(_bgr(jpeg_bayt(masada_egik_cekim(koseler=DIK_15, kagit=cerceveli_tablo()))))
+    assert a["belge"] and _kose_hatasi(a["koseler"], DIK_15) < 0.01
+
+
+def test_taranmis_belge_yuklemede_rozet_alir_kirpma_kontrolu_yok(girisli, monkeypatch):
+    c, k = girisli
+    monkeypatch.setattr(ocr, "metin_cikar", lambda *a: "FATURA")
+    baslik = {"Accept": "application/json"}
+    tablo = yukle(c, jpeg_bayt(tarayici_ciktisi(cerceveli_tablo())), "tablo.jpg", headers=baslik).get_json()["belge_id"]
+    foto = yukle(c, jpeg_bayt(masada_egik_cekim(koseler=DIK_15)), "foto.jpg", headers=baslik).get_json()["belge_id"]
+
+    kayit = database.belge_icerigi(k["id"], tablo)
+    assert kayit["koseler"] is None and kayit["orijinal_saklandi"]
+    assert isleme_durumu(c, tablo)["kirpma_kontrol"] is False
+    sayfa_html = c.get(f"/belge/{tablo}").get_data(as_text=True)
+    assert "data-taranmis-rozeti" in sayfa_html and "Taranmış belge, kırpma uygulanmadı" in sayfa_html
+    assert "data-kirpma-kontrol" not in sayfa_html
+    assert f"/belge/{tablo}?koseler=1" in sayfa_html  # yanlissa elle kirpilabilir
+    assert "data-taranmis-rozeti" not in c.get(f"/belge/{foto}").get_data(as_text=True)
+
+    # Elle kirpilinca rozet kalkar.
+    g, y = Image.open(io.BytesIO(crypto.coz(kayit["veri"]))).size
+    elle = [[0.1 * g, 0.1 * y], [0.9 * g, 0.1 * y], [0.9 * g, 0.9 * y], [0.1 * g, 0.9 * y]]
+    c.post(f"/belge/{tablo}/koseler", data={"koseler": json.dumps(elle)})
+    assert "data-taranmis-rozeti" not in c.get(f"/belge/{tablo}").get_data(as_text=True)
 
 
 # ---------------------------------------------------------------- v5: orijinal + kose saklama
