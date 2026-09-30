@@ -2,6 +2,8 @@
 
 **Dijital arşiv ve belge sınıflandırma sistemi**
 
+Sürüm 1.1.0 · AGPL-3.0 lisanslı
+
 Telefonla çekilmiş yamuk, gölgeli bir belge fotoğrafını **tarayıcıdan çıkmış gibi görünen bir belgeye**
 dönüştüren ve **aranabilir A4 PDF** olarak veren bir "tarayıcı + arşiv" uygulaması. Fotoğraf **OpenCV** ile
 kırpılıp düzeltilir ve tarama filtresinden geçirilir, **Tesseract OCR** ile metne çevrilir, **Groq** üzerindeki
@@ -111,30 +113,30 @@ bağlı tarayıcıdan alınıp arşivlenir. Bkz. [Yerel mod](#yerel-mod-kurum-ku
 
 ```mermaid
 flowchart LR
-    K[Kullanıcı<br/>tarayıcı] -->|HTTPS| F
+    K["Kullanıcı<br/>tarayıcı"] -->|"HTTPS"| F
 
-    subgraph F[Flask uygulaması]
+    subgraph F["Flask uygulaması"]
         direction TB
-        G[Flask-Login oturum<br/>CSRF · hız sınırı] --> Y[/yukle/<br/>sıkıştır + şifrele]
-        Y -->|tam çözünürlüklü dosya<br/>bellekte| I
-        subgraph I[isleme.py — arka plan işçisi]
+        G["Flask-Login oturum<br/>CSRF · hız sınırı"] --> Y["/yukle<br/>sıkıştır + şifrele"]
+        Y -->|"tam çözünürlüklü dosya<br/>bellekte"| I
+        subgraph I["isleme.py — arka plan işçisi"]
             direction TB
-            R[goruntu_duzelt.py<br/>köşe algılama] --> T[tarama.py<br/>gri tarama]
-            T --> O[ocr.py<br/>Tesseract OCR]
-            O --> C[classifier.py<br/>+ alanlar.py doğrulama]
+            R["goruntu_duzelt.py<br/>köşe algılama"] --> T["tarama.py<br/>gri tarama"]
+            T --> O["ocr.py<br/>Tesseract OCR"]
+            O --> C["classifier.py<br/>+ alanlar.py doğrulama"]
         end
         X["/disa-aktar<br/>excel.py (Excel)"]
         P["/tarama · /pdf · /word<br/>tarama.py · pdf_uret.py · word_uret.py<br/>+ görsel önbelleği"]
         Z["/isleme-durumu<br/>tarayıcı yoklaması"]
     end
 
-    C -->|OCR metni| Q[(Groq API)]
-    Q -->|tür, güven, açıklama, alanlar| C
-    Y -->|belge: bekliyor| D[(PostgreSQL<br/>kullanicilar · belgeler<br/>+ iş kuyruğu sütunları)]
-    I <-->|iş al · aşama sonucu · tamamla| D
-    D -->|kullanici_id ile filtrelenmiş sorgular<br/>bağlantı havuzu| F
+    C -->|"OCR metni"| Q[("Groq API")]
+    Q -->|"tür, güven, açıklama, alanlar"| C
+    Y -->|"belge: bekliyor"| D[("PostgreSQL<br/>kullanicilar · belgeler<br/>+ iş kuyruğu sütunları")]
+    I <-->|"iş al · aşama sonucu · tamamla"| D
+    D -->|"kullanici_id ile filtrelenmiş sorgular<br/>bağlantı havuzu"| F
     D --> X
-    D -->|orijinal + köşeler| P
+    D -->|"orijinal + köşeler"| P
     D --> Z
 ```
 
@@ -514,13 +516,13 @@ güvenlik duvarı): **[docs/KURULUM_KURUM.md](docs/KURULUM_KURUM.md)**. Yerel mo
 
 ## Geliştirme ortamı kurulumu
 
-**Gereksinimler:** Python 3.10+, Tesseract OCR + Türkçe dil paketi (`tur.traineddata`),
+**Gereksinimler:** Python 3.12+, Tesseract OCR + Türkçe dil paketi (`tur.traineddata`),
 bir [Groq API anahtarı](https://console.groq.com/keys) ve bir PostgreSQL veritabanı
 (ör. [Neon](https://neon.com) ücretsiz planı).
 
 ```bash
-git clone <repo-adresi>
-cd dijital-arsiv
+git clone https://github.com/Abrahamexe/ArcBase.git
+cd ArcBase
 python -m venv .venv
 .venv\Scripts\activate          # Windows  (macOS/Linux: source .venv/bin/activate)
 pip install -r requirements.txt
@@ -532,7 +534,7 @@ pip install -r requirements.txt
 |---|---|
 | `GROQ_API_KEY` | Groq konsolundan alınan API anahtarı |
 | `DATABASE_URL` | `postgresql://kullanici:sifre@host/veritabani?sslmode=require` biçiminde bağlantı adresi |
-| `TEST_DATABASE_URL` | Testler ve `docs/hiz_olcumu.py` için **ayrı** bir veritabanı (aynı biçim); `DATABASE_URL` ile aynı olamaz |
+| `TEST_DATABASE_URL` | Testler ve `docs/hiz_olcumu.py` için **ayrı** bir veritabanı (aynı biçim); `DATABASE_URL` ya da `YEREL_DATABASE_URL` ile aynı olamaz |
 | `ENCRYPTION_KEY` | `python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"` |
 | `SECRET_KEY` | `python -c "import secrets; print(secrets.token_hex(32))"` |
 | `GROQ_MODEL` | Opsiyonel, varsayılan `openai/gpt-oss-120b` |
@@ -588,7 +590,7 @@ atlanır.
 
 **Test veritabanı:** Testler yalnızca `.env`'deki **`TEST_DATABASE_URL`**'i kullanır; canlı veritabanına
 (`DATABASE_URL`) hiçbir koşulda bağlanmaz. `TEST_DATABASE_URL` tanımlı değilse veritabanı gerektiren testler
-açık bir uyarıyla atlanır (saf görüntü/tarama testleri yine çalışır); `DATABASE_URL` ile aynıysa test oturumu
+açık bir uyarıyla atlanır (saf görüntü/tarama testleri yine çalışır); `DATABASE_URL` ya da `YEREL_DATABASE_URL` ile aynıysa test oturumu
 hata verip durur. `docs/hiz_olcumu.py` da aynı kurala uyar. Testler benzersiz adlı geçici kullanıcılar
 oluşturup sonunda siler. Testlerde arka plan işçisi kendiliğinden başlamaz; yüklenen belgenin işi test
 içinde hemen çalıştırılır ve yalnızca o belge işlenir. Groq çağrıları taklit edilir. Taklit, anahtarın geçersizleşmesi,
@@ -619,6 +621,15 @@ değilse atlanır.
 | `test_excel.py` | Dosya adı, başlıklar, hücre tipleri, filtreler, toplam satırı, formül enjeksiyonu |
 | `test_arayuz.py` | Gerçek tarayıcıda (arka plan işçisiyle) toplu yükleme ve işleme durumu, tek dosyada kendiliğinden güncellenen belge sayfası, 10 dosya sınırı, kota uyarısı, bilgi çıkarma ilerlemesi, filtre ve düzenleme formu, tarama modu ve karşılaştırma, köşe editörü (sürükleme, büyüteç, kaydetme), "Kırpmayı kontrol et", PDF indirme, çoklu seçim ve birleştirme |
 | `test_veri_ayrimi.py` | İki kullanıcı arasında veri ayrımı (v4 uç noktaları dahil) |
+| `test_yerel_mod.py` | Yerel mod koruması (bulut adresinin reddi, yerel/özel ağ adresinin kabulü) ve arayüzün hiçbir dış adrese istek atmaması |
+| `test_yonetici.py` | Yöneticinin belirlenmesi, Gelen belgeler kutusu, atama kaydı, kota; yöneticinin başkasının arşivini görememesi |
+| `test_klasor_izleme.py` | Tarama klasörü: kullanıcı alt klasörü, kök klasör (varsayılan kullanıcı / yöneticinin kutusu), yarım yazılmış dosya, TIFF, hatalı dosya, kota, dosyaların taşınması |
+| `test_klasor_secimi.py` | Tarama klasörleri sayfası: erişim (yönetici ya da sunucu bilgisayarı), son taranan dosyayı bulma ve önizleme, klasör ekleme/kaldırma |
+| `test_tarayici_wia.py` | Bağlı tarayıcıdan doğrudan tarama (sahte COM katmanıyla): algılama, otomatik kaynak seçimi, sayfa sayfa tarama, sade hata mesajları |
+| `test_tarayici_wia_gercek.py` | **İsteğe bağlı, gerçek tarayıcı (yalnızca Windows):** gerçek WIA ile algılama ve tarama (`TARAYICI_GERCEK_TARA=1` ile camdaki kâğıdı tarar) |
+| `test_yerel_veri.py` | Veri taşıma (`scripts/veri_tasi.py`), yedekleme (`scripts/yedekle.py`) ve testlerin canlı veritabanına bağlanmama koruması |
+| `test_anahtar_yenile.py` | `ENCRYPTION_KEY` yenileme (`scripts/anahtar_yenile.py`): dry-run, uygulama, doğrulama, hatalı eski anahtar, geri alma, yedek denetimi |
+| `test_etkiler.py` | Arayüz etkilerinin şablonlardaki yeri (her etki tek yerde) |
 | `test_kimlik.py`, `test_belgeler.py` | Hesaplar, oturum, yükleme, OCR, sıkıştırma, PDF, kota |
 
 ## Yayına alma (Render + Docker)
@@ -674,8 +685,8 @@ IP'sine göre çalışır).
 - İmaj, OpenCV için `libglib2.0-0` paketini de kurar.
 - Uygulamayı yerelde Docker ile denemek için:
   ```bash
-  docker build -t dijital-arsiv .
-  docker run --rm -p 10000:10000 --env-file .env dijital-arsiv
+  docker build -t arcbase .
+  docker run --rm -p 10000:10000 --env-file .env arcbase
   ```
   (Yerel HTTP'de `Secure` çerezler gönderilmediği için giriş yapabilmek adına `-e URETIM=0` ekleyin.)
 
@@ -776,8 +787,8 @@ PDF/Word/Excel üretimi sunucuda yapılır. Arayüz dış kaynak yüklemez. Bulu
 | `word_uret.py` | `.docx` üretimi (python-docx) |
 | `excel.py` | `.xlsx` üretimi (openpyxl) |
 | `crypto.py` | Fernet ile şifreleme / çözme |
-| `templates/` | Açılış, giriş, kayıt, panel, kategori, belge, arama, hesap ve hata sayfaları |
-| `static/` | `app.js` (arayüz davranışları, işleme durumu yoklaması), `style.css` (tema ve animasyonlar), `tailwind.css` (derlenmiş Tailwind), `tailwind.giris.css` (derleme girdisi) |
+| `templates/` | Açılış, giriş, kayıt, panel, kategori, belge, arama, hesap, Gelen belgeler, tarama, tarama klasörleri, tarama durumu ve hata sayfaları; ortak parçalar (`base.html`, `_bilesenler.html`) |
+| `static/` | `app.js` (arayüz davranışları, işleme durumu yoklaması), `style.css` (tema ve animasyonlar), `tailwind.css` (derlenmiş Tailwind), `tailwind.giris.css` (derleme girdisi), `etkiler.css` / `etkiler.js` (görsel etkiler) |
 | `tailwind.config.js` | Tailwind derleme ayarları (renkler, font, taranan dosyalar) |
 | `tests/` | pytest testleri; `ornek_gorseller.py` sentetik fotoğraflar üretir (masa, perspektif, sarı ışık, gölge, mühür) |
 | `docs/once_sonra.py` | Kendi fotoğraflarınızdan README için tarama öncesi/sonrası görseli üretir |
@@ -825,7 +836,7 @@ PDF/Word/Excel üretimi sunucuda yapılır. Arayüz dış kaynak yüklemez. Bulu
 | `GET /tara` · `POST /tara` · `POST /tara/bitir` · `POST /tara/iptal` | Tek tuşla tarama (besleyicide tüm sayfalar; camda sayfa sayfa, "Bitir" ile tek belge) · vazgeçme (Windows) |
 | `GET /tarayici/durum` | Bağlı tarayıcılar, tarama ilerlemesi, bitirilmemiş sayfa sayısı (sayfalar birkaç saniyede bir sorar) |
 | `GET /tarama-durumu` | Yönetici: bağlı tarayıcılar, izlenen klasörler, son aktarılan dosyalar, son hatalar (yalnızca bilgi) |
-| `GET /klasorler` · `GET /klasorler/son-dosyalar` · `GET /klasorler/gez` · `POST /klasorler/ekle` · `POST /klasorler/kaldir` | Tarama klasörleri: son taranan belgeyi bulma, klasör gezme, ekleme/kaldırma (yalnızca yönetici ya da sunucu bilgisayarının kendisi) |
+| `GET /klasorler` · `GET /klasorler/son-dosyalar` · `GET /klasorler/onizleme/<anahtar>` · `GET /klasorler/gez` · `POST /klasorler/ekle` · `POST /klasorler/kaldir` | Tarama klasörleri: son taranan belgeyi bulma, klasör gezme, ekleme/kaldırma (yalnızca yönetici ya da sunucu bilgisayarının kendisi) |
 
 Belge route'larının tamamı giriş gerektirir; başka kullanıcının belgesi istendiğinde 404 döner.
 
