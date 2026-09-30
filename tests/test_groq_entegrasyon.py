@@ -15,7 +15,7 @@ import pytest
 
 import classifier
 import database
-from conftest import GERCEK_SINIFLANDIR, ocr_gerekli, yukle
+from conftest import GERCEK_SINIFLANDIR, SAHTE_TC_NO, ocr_gerekli, yukle
 from ornek_gorseller import jpeg_bayt, sayfa
 
 pytestmark = [
@@ -40,8 +40,8 @@ gerekli onarımın yapılmasını arz ederim.
 02.04.2026
 Ayşe Yılmaz"""
 
-KIMLIK = """TÜRKİYE CUMHURİYETİ KİMLİK KARTI
-T.C. Kimlik No 12345678950
+KIMLIK = f"""TÜRKİYE CUMHURİYETİ KİMLİK KARTI
+T.C. Kimlik No {SAHTE_TC_NO}
 Soyadı YILMAZ  Adı AYŞE
 Doğum Tarihi 12.05.1990
 Seri No A12Z34567
@@ -84,7 +84,7 @@ def test_kimlikte_hassas_bilgi_saklanmaz():
     sonuc = _basarili(classifier.siniflandir(KIMLIK))
     assert sonuc["tur"] == "kimlik"
     duz = str(sonuc)
-    for yasak in ("12345678950", "A12Z34567", "1990"):
+    for yasak in (SAHTE_TC_NO, "A12Z34567", "1990"):
         assert yasak not in duz
 
 

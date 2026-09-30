@@ -12,7 +12,7 @@ import alanlar
 import classifier
 import database
 import ocr
-from conftest import GERCEK_SINIFLANDIR, belge_ekle, jpeg, yukle
+from conftest import GERCEK_SINIFLANDIR, SAHTE_TC_NO, belge_ekle, jpeg, yukle
 
 
 class SahteGroq:
@@ -78,7 +78,7 @@ def test_dilekce_bilgileri(groq_cevabi):
 
 
 def test_kimlikte_tc_dogum_tarihi_ve_seri_no_saklanmaz(groq_cevabi, girisli, monkeypatch):
-    tc, seri = "12345678950", "A12Z34567"
+    tc, seri = SAHTE_TC_NO, "A12Z34567"
     groq_cevabi({
         "tur": "kimlik", "guven": 0.99,
         "aciklama": f"T.C. {tc} numaralı kimlik kartı",
@@ -103,7 +103,7 @@ def test_kimlikte_tc_dogum_tarihi_ve_seri_no_saklanmaz(groq_cevabi, girisli, mon
 
 
 def test_kimlik_metin_alaninda_numara_reddedilir():
-    temiz, hatalar = alanlar.dogrula("kimlik", {"belge_turu": "Ehliyet 12345678950"})
+    temiz, hatalar = alanlar.dogrula("kimlik", {"belge_turu": f"Ehliyet {SAHTE_TC_NO}"})
     assert temiz["belge_turu"] is None and hatalar == ["Belge türü"]
 
 
@@ -207,7 +207,7 @@ def test_elle_duzenlemede_gecersiz_deger_kaydedilmez(girisli):
 def test_kimlikte_elle_tc_girilemez(girisli):
     c, k = girisli
     belge_id = belge_ekle(k["id"], tur="kimlik")
-    r = c.post(f"/belge/{belge_id}/alanlar", data={"belge_turu": "TC 12345678950"},
+    r = c.post(f"/belge/{belge_id}/alanlar", data={"belge_turu": f"TC {SAHTE_TC_NO}"},
                follow_redirects=True)
     assert "saklanmaz" in r.get_data(as_text=True)
     assert database.belge_getir(k["id"], belge_id)["alanlar"] is None

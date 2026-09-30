@@ -281,6 +281,11 @@ def sahte_groq(monkeypatch):
     monkeypatch.setattr(classifier, "siniflandir", sahte)
 
 
+# Acikca sahte TC kimlik no: ardisik rakamlar, TC dogrulama algoritmasina UYMAZ (hicbir gercek kisiye ait olamaz).
+# Kod yalnizca "11 haneli sayi" kalibina bakar; testler algoritma gecerliligi gerektirmez.
+SAHTE_TC_NO = "12345678900"
+
+
 SAHTE_FATURA_ALANLARI = {
     "kurum": "Test Elektrik A.Ş.",
     "tutar": 720.0,

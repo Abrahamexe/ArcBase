@@ -18,7 +18,7 @@ bağlı tarayıcıdan alınıp arşivlenir. Bkz. [Yerel mod](#yerel-mod-kurum-ku
 > **Canlı site:** _yayına alındıktan sonra buraya eklenecek_ (Render ücretsiz katmanında çalışır; site
 > bir süre boşta kalınca uykuya geçer, ilk açılış 30-60 saniye sürebilir.)
 
-![Panel](docs/screenshots/panel.png)
+![ArcBase paneli: karşılama, özet kartları, tarayıcı durumu ve hızlı yükleme](docs/screenshots/panel.png)
 
 ## Özellikler
 
@@ -68,22 +68,25 @@ bağlı tarayıcıdan alınıp arşivlenir. Bkz. [Yerel mod](#yerel-mod-kurum-ku
 
 | Belge detayı: renkli tarama ve çıkarılan bilgiler | Önce \| sonra karşılaştırması |
 |---|---|
-| ![Belge](docs/screenshots/belge.png) | ![Önce sonra](docs/screenshots/tarama-karsilastirma.png) |
+| ![Belge detayı: renkli tarama, güven skoru ve çıkarılan fatura bilgileri](docs/screenshots/belge.png) | ![Önce sonra: filtresiz fotoğraf ile tarama sonucunu sürüklenebilir ayırıcıyla karşılaştırma](docs/screenshots/tarama-karsilastirma.png) |
 | **Elle köşe ayarlama (büyüteçle)** | **Seçilen belgeleri tek PDF'te birleştirme** |
-| ![Köşe ayarlama](docs/screenshots/kose-duzenleme.png) | ![Seçim ve birleştirme](docs/screenshots/secim-birlestirme.png) |
-| **Fatura filtreleri ve toplam tutar** | **Toplu yükleme (sürerken)** |
-| ![Fatura filtreleri](docs/screenshots/fatura-filtre.png) | ![Toplu yükleme](docs/screenshots/toplu-yukleme.png) |
+| ![Köşe ayarlama: dört tutamaç ve köşe büyüteci](docs/screenshots/kose-duzenleme.png) | ![Seçim ve birleştirme: seçim sırası numarayla, "Seçilenleri PDF yap" çubuğu](docs/screenshots/secim-birlestirme.png) |
+| **Fatura filtreleri ve toplam tutar** | **Toplu yükleme (arka planda işlenirken)** |
+| ![Fatura filtreleri: tarih ve tutar aralığı, filtreye göre toplam tutar](docs/screenshots/fatura-filtre.png) | ![Toplu yükleme: dosya başına durum, geçersiz dosya için hata satırı](docs/screenshots/toplu-yukleme.png) |
 | **Hesap: kota ve mevcut belgelerden bilgi çıkarma** | **Açılış sayfası** |
-| ![Hesap](docs/screenshots/hesap.png) | ![Açılış](docs/screenshots/acilis.png) |
-| **Koyu tema** | |
-| ![Koyu tema](docs/screenshots/panel-koyu.png) | |
-
+| ![Hesap: belge kotası, bilgi çıkarma, şifre değiştirme](docs/screenshots/hesap.png) | ![Açılış sayfası](docs/screenshots/acilis.png) |
+| **Koyu tema** | **Giriş** |
+| ![Koyu tema: panel](docs/screenshots/panel-koyu.png) | ![Giriş sayfası](docs/screenshots/giris.png) |
 
 <p align="center">
   <img src="docs/screenshots/mobil-giris.png" width="240" alt="Mobil giriş">
   <img src="docs/screenshots/mobil-panel.png" width="240" alt="Mobil panel">
-  <img src="docs/screenshots/mobil-menu.png" width="240" alt="Mobil menü">
+  <img src="docs/screenshots/mobil-menu.png" width="240" alt="Mobil menü: Arşiv ve Yönetim grupları">
 </p>
+
+> Ekran görüntülerindeki belgeler, firmalar ve kullanıcı ("demo") tamamen sentetiktir; gerçek kişi ya da kurum
+> bilgisi yoktur. `python scripts/ekran_goruntusu.py` bunları, yalnızca `TEST_DATABASE_URL`'deki test
+> veritabanında ve geçici bir sunucu portunda, sentetik belgelerle yeniden üretir (Playwright + Chromium).
 
 ## Kullanılan teknolojiler
 
@@ -540,7 +543,9 @@ pip install -r requirements.txt
 Tüm değişkenlerin tam listesi için `.env.example` dosyasına bakın.
 
 > ⚠️ **`ENCRYPTION_KEY` bir kez üretilir ve asla değiştirilmez.** Kaybolursa veya değişirse
-> veritabanındaki tüm belgeler çözülemez hale gelir. Güvenli bir yere yedekleyin.
+> veritabanındaki tüm belgeler çözülemez hale gelir. Güvenli bir yere yedekleyin. Anahtar yalnızca
+> `scripts/anahtar_yenile.py` ile (yedek alıp uygulamayı durdurarak, kayıtları yeni anahtarla yeniden
+> şifreleyerek) değiştirilir; `.env`'yi elle değiştirmek belgeleri açılmaz hale getirir.
 
 Çalıştırma:
 
@@ -688,6 +693,12 @@ Aynı kod iki şekilde çalışır; seçim `.env` ile yapılır:
 Yeni ayarların hiçbiri verilmezse uygulama bugünkü gibi çalışır. Teknik olmayan biri için adım adım Windows
 kurulumu: **[docs/KURULUM_KURUM.md](docs/KURULUM_KURUM.md)**.
 
+| Gelen belgeler (yönetici) | Tarama klasörleri | Tarama durumu (yönetici) |
+|---|---|---|
+| ![Gelen belgeler: sahibi belli olmayan taramalar, kullanıcıya ata](docs/screenshots/gelen-belgeler.png) | ![Tarama klasörleri: izlenen klasörler ve "Taradığım belgeler görünmüyor" yardımcısı](docs/screenshots/izlenen-klasorler.png) | ![Tarama durumu: bağlı tarayıcılar, izlenen klasörler, son aktarılan dosyalar ve hatalar](docs/screenshots/yonetici-tarama-durumu.png) |
+
+(Klasör yolları ve tarayıcı adı örnektir.)
+
 - **Yerel mod koruması** (`yerel_mod.py`): `YEREL_MOD=1` iken `DATABASE_URL`'in sunucusu `localhost`,
   `127.x`, `::1`, Unix soketi ya da özel ağ adresi (10.x, 172.16-31.x, 192.168.x, fc00::/7) olmalıdır. Bulut
   adresiyle uygulama **başlamaz** ve nedenini yazar (adres ve şifre yazdırılmaz). Sunucu adları kabul
@@ -770,6 +781,8 @@ PDF/Word/Excel üretimi sunucuda yapılır. Arayüz dış kaynak yüklemez. Bulu
 | `tailwind.config.js` | Tailwind derleme ayarları (renkler, font, taranan dosyalar) |
 | `tests/` | pytest testleri; `ornek_gorseller.py` sentetik fotoğraflar üretir (masa, perspektif, sarı ışık, gölge, mühür) |
 | `docs/once_sonra.py` | Kendi fotoğraflarınızdan README için tarama öncesi/sonrası görseli üretir |
+| `scripts/ekran_goruntusu.py` | README ekran görüntülerini sentetik belgelerle, test veritabanında ve geçici portta yeniden üretir (Playwright) |
+| `scripts/anahtar_yenile.py` | `ENCRYPTION_KEY` yenileme: belgelerin şifreli içeriğini eski anahtarla çözüp yeni anahtarla yeniden şifreler (varsayılan dry-run, `--uygula`, tek transaction, yedek denetimi) |
 | `docs/hiz_olcumu.py` | İstek sürelerini parçalara ayırarak ölçer, iki ölçümü karşılaştırır |
 | `Dockerfile` | Tesseract + gunicorn içeren üretim imajı |
 | `gunicorn.conf.py` | Worker açılınca arka plan işçisini (ve ayarlıysa klasör izlemeyi) başlatır |
