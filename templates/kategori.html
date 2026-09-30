@@ -13,47 +13,32 @@
 {% set ns = namespace(kontrol=0) %}
 {% for b in belgeler %}{% if ui.dusuk_guven_mi(b) %}{% set ns.kontrol = ns.kontrol + 1 %}{% endif %}{% endfor %}
 
-<nav aria-label="Konum" class="kart-giris mb-5 flex items-center gap-1.5 text-sm text-metin-3" style="--i: 0">
-  <a href="{{ url_for('index') }}" class="font-medium transition-colors hover:text-metin">Panel</a>
-  {{ ui.ikon('sag', 'w-3.5 h-3.5') }}
-  <span class="font-semibold text-metin-2">{{ turler[tur].ad }}</span>
-</nav>
-
-<header class="kart-giris mb-8 flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between" style="--i: 1">
-  <div class="flex items-center gap-4">
-    <span class="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl {{ ui.renk(tur, 'kutu') }}">
-      {{ ui.tur_ikonu(tur, 'w-7 h-7') }}
-    </span>
-    <div class="min-w-0">
-      <h1 class="text-2xl font-extrabold tracking-tight text-metin sm:text-[28px]">{{ turler[tur].ad }}</h1>
-      <p class="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-metin-2">
-        <span><span class="font-semibold text-metin">{{ toplam }}</span> belge{% if suzgec %} <span class="text-metin-3">(filtreye uyan)</span>{% endif %}</span>
-        {% if tur_sayilari[tur].son_tarih %}
-          <span class="text-metin-3" aria-hidden="true">·</span>
-          <span>son yükleme {{ ui.zaman(tur_sayilari[tur].son_tarih) }}</span>
-        {% endif %}
-        {% if ns.kontrol %}
-          <span class="text-metin-3" aria-hidden="true">·</span>
-          <span class="inline-flex items-center gap-1 font-medium text-orange-600 dark:text-orange-300">
-            {{ ui.ikon('uyari', 'w-3.5 h-3.5') }}{{ ns.kontrol }} belge kontrol bekliyor
-          </span>
-        {% endif %}
-      </p>
-    </div>
-  </div>
-  <div class="flex gap-2 self-start sm:self-auto">
-    {% if belgeler %}{{ ui.secim_dugmesi() }}{{ ui.excel_dugmesi(dict(suzgec, tur=tur)) }}{% endif %}
-    <button type="button" class="btn btn-birincil" data-yukleme-ac>
-      {{ ui.ikon('arti', 'w-4 h-4', '2.4') }}Belge yükle
-    </button>
-  </div>
-</header>
+{% set kategori_bilgisi %}
+  <span class="flex flex-wrap items-center gap-x-2 gap-y-1">
+    <span><span class="font-medium text-metin">{{ toplam }}</span> belge{% if suzgec %} <span class="text-metin-3">(filtreye uyan)</span>{% endif %}</span>
+    {% if tur_sayilari[tur].son_tarih %}
+      <span class="text-metin-3" aria-hidden="true">·</span>
+      <span>son yükleme {{ ui.zaman(tur_sayilari[tur].son_tarih) }}</span>
+    {% endif %}
+    {% if ns.kontrol %}
+      <span class="text-metin-3" aria-hidden="true">·</span>
+      <span class="inline-flex items-center gap-1 font-medium text-orange-700 dark:text-orange-300">
+        {{ ui.ikon('uyari', 'w-3.5 h-3.5') }}{{ ns.kontrol }} belge kontrol bekliyor
+      </span>
+    {% endif %}
+  </span>
+{% endset %}
+{% call ui.sayfa_basligi([('Arşiv', none), ('Kategoriler', none), (turler[tur].ad, none)], turler[tur].ad,
+                         kategori_bilgisi) %}
+  {% if belgeler %}{{ ui.secim_dugmesi() }}{{ ui.excel_dugmesi(dict(suzgec, tur=tur)) }}{% endif %}
+  <button type="button" class="btn btn-birincil" data-yukleme-ac>{{ ui.ikon('arti', 'w-4 h-4', '2') }}Belge yükle</button>
+{% endcall %}
 
 {{ ui.suzgec_formu(url_for('kategori', tur=tur), suzgec, tutar=(tur == 'fatura')) }}
 
 {% if tutar_toplamlari is not none and (belgeler or suzgec) %}
   {% set tutarsiz = belgeler | selectattr('tutar', 'none') | list | length %}
-  <section class="kart-giris mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2" style="--i: 3" aria-label="Fatura özeti" data-fatura-ozeti>
+  <section class="bolum-giris mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2" style="--i: 3" aria-label="Fatura özeti" data-fatura-ozeti>
     <div class="renkli-kart ton-gunes rounded-2xl border p-5 shadow-kart">
       <div class="flex items-start justify-between">
         <p class="text-sm font-semibold text-metin-2">Toplam tutar</p>
@@ -61,19 +46,19 @@
       </div>
       {% if tutar_toplamlari %}
         {% for para, deger in tutar_toplamlari | dictsort %}
-          <p class="mt-1 text-2xl font-extrabold tracking-tight tabular-nums text-metin sm:text-3xl">{{ deger | tutar(para) }}</p>
+          <p class="mt-1 text-2xl font-semibold tracking-tight tabular-nums text-metin sm:text-3xl">{{ deger | tutar(para) }}</p>
         {% endfor %}
       {% else %}
-        <p class="mt-1 text-2xl font-extrabold text-metin-3">—</p>
+        <p class="mt-1 text-2xl font-semibold text-metin-3">—</p>
       {% endif %}
       <p class="mt-1 text-xs text-metin-3">{{ 'Seçili filtreye göre' if suzgec else 'Tüm faturalar' }}{% if tutarsiz %} · {{ tutarsiz }} faturada tutar okunamadı{% endif %}</p>
     </div>
     <div class="renkli-kart ton-buz rounded-2xl border p-5 shadow-kart">
       <div class="flex items-start justify-between">
         <p class="text-sm font-semibold text-metin-2">Belge sayısı</p>
-        <span class="renkli-ikon ton-buz flex h-10 w-10 items-center justify-center rounded-xl">{{ ui.ikon('fatura') }}</span>
+        <span class="flex h-8 w-8 border border-cizgi bg-yuzey/60 text-metin-2 items-center justify-center rounded-xl">{{ ui.ikon('fatura') }}</span>
       </div>
-      <p class="mt-1 text-2xl font-extrabold tracking-tight tabular-nums text-metin sm:text-3xl">{{ toplam }}</p>
+      <p class="mt-1 text-2xl font-semibold tracking-tight tabular-nums text-metin sm:text-3xl">{{ toplam }}</p>
       <p class="mt-1 text-xs text-metin-3">{{ 'Seçili filtreye uyan fatura' if suzgec else 'Arşivdeki fatura' }}</p>
     </div>
   </section>

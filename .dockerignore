@@ -22,3 +22,8 @@ DEVAM.md
 .araclar/
 .pytest_cache/
 .claude/
+
+# Yerel mod: gunlukler ve yedekler imaja girmez
+logs/
+yedekler/
+veri/

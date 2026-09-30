@@ -11,6 +11,10 @@ Flask web uygulamasıdır.
 
 Her kullanıcı kayıt olup giriş yapar ve **yalnızca kendi belgelerini** görür.
 
+Bulutta (Neon + Render) ya da **kurumun kendi Windows bilgisayarında, belgeler ve veritabanı dışarı
+çıkmadan** (yerel mod) çalışır; yerel modda tarayıcıdan gelen belgeler izlenen bir klasörden ya da doğrudan
+bağlı tarayıcıdan alınıp arşivlenir. Bkz. [Yerel mod](#yerel-mod-kurum-kurulumu) ve [Veri akışı](#veri-akışı).
+
 > **Canlı site:** _yayına alındıktan sonra buraya eklenecek_ (Render ücretsiz katmanında çalışır; site
 > bir süre boşta kalınca uykuya geçer, ilk açılış 30-60 saniye sürebilir.)
 
@@ -93,11 +97,12 @@ Her kullanıcı kayıt olup giriş yapar ve **yalnızca kendi belgelerini** gör
 | Word | python-docx |
 | Sınıflandırma + bilgi çıkarma | Groq API (OpenAI uyumlu istemci, varsayılan model `openai/gpt-oss-120b`) |
 | Excel | openpyxl |
-| Veritabanı | PostgreSQL (Neon), psycopg2 |
+| Veritabanı | PostgreSQL (Neon ya da yerel), psycopg2 |
 | Şifreleme | cryptography (Fernet) |
 | Arayüz | Tailwind CSS (standalone CLI ile önceden derlenmiş statik CSS), sade JavaScript |
 | Arka plan işleri | Uygulama içi işçi iş parçacığı, kuyruk PostgreSQL'de (`FOR UPDATE SKIP LOCKED`) |
-| Yayın | Docker, gunicorn, Render |
+| Yayın | Docker, gunicorn, Render · Windows'ta waitress (yerel mod) |
+| Tarayıcı entegrasyonu | watchdog (izlenen klasör), pywin32 + WIA (bağlı tarayıcı, yalnızca Windows) |
 
 ## Mimari
 
@@ -346,6 +351,10 @@ ALTER TABLE belgeler ADD COLUMN IF NOT EXISTS isleme_deneme INTEGER NOT NULL DEF
 ALTER TABLE belgeler ADD COLUMN IF NOT EXISTS isleme_bilgi JSONB;        -- aşama, uyarılar, kırpma kontrolü, hata
 ALTER TABLE belgeler ADD COLUMN IF NOT EXISTS icerik_surumu INTEGER NOT NULL DEFAULT 0;  -- görsel değişince artar (ETag)
 CREATE INDEX IF NOT EXISTS idx_belgeler_isleme ON belgeler(id) WHERE isleme_durumu IN ('bekliyor', 'isleniyor');
+-- v6 (kurum / yerel mod): yönetici ve Gelen belgeler kutusu
+ALTER TABLE kullanicilar ADD COLUMN IF NOT EXISTS yonetici BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE belgeler ADD COLUMN IF NOT EXISTS gelen_kutusu BOOLEAN NOT NULL DEFAULT FALSE;  -- yöneticinin kutusunda, arşive sayılmaz
+ALTER TABLE belgeler ADD COLUMN IF NOT EXISTS atama_gecmisi JSONB;  -- [{islem, yapan_id, yapan, kime_id, kime, zaman}]
 ```
 
 Tüm komutlar tek gidiş-dönüşte gönderilir.
@@ -430,7 +439,77 @@ python docs/hiz_olcumu.py --kok ../eski-kopya --tarayici --json once.json
 python docs/hiz_olcumu.py --karsilastir once.json sonra.json
 ```
 
-## Yerel kurulum
+## Çalıştırma modları
+
+Tek repo, tek kod tabanı: ArcBase **yerel mod** (kurumun kendi bilgisayarı) ya da **bulut modu** (Neon +
+Render) ile çalışır. Seçim `.env` dosyasıyla yapılır.
+
+| | Yerel mod | Bulut modu |
+|---|---|---|
+| Veritabanı | Bu bilgisayardaki (ya da yerel ağdaki) PostgreSQL | Neon gibi barındırılan PostgreSQL |
+| Veri konumu | Belgeler ve veritabanı kurumun bilgisayarında kalır; dışarı yalnızca Groq'a OCR metni gider | Veritabanı bulut sağlayıcıda, uygulama Render'da |
+| Kimler için uygun | Belgelerin kurum dışına çıkmaması gereken kurumlar; tek bilgisayar ya da yerel ağ | Kurulum istemeyen, internetten erişilen deneme ve canlı yayın |
+| `YEREL_MOD` | `1` | Tanımlı değil (boş) |
+| `DATABASE_URL` | `localhost` ya da özel ağ adresi | Bulut adresi (`?sslmode=require`) |
+| Sunucu | Windows, `baslat.bat` (waitress) | Render + Docker (gunicorn) |
+
+Kod her iki modda aynıdır. Modlar arasındaki fark `.env` içindeki `YEREL_MOD`, `DATABASE_URL` (ve testler
+için `TEST_DATABASE_URL`) değerleridir; yerel moda özgü ek ayarlar (tarama klasörü, yedekleme vb.) isteğe
+bağlıdır ve `.env.example`'ın "Yerel mod" bölümündedir.
+
+> ⚠️ **`.env` dosyası asla commit edilmez.** Groq anahtarı, veritabanı şifresi, `ENCRYPTION_KEY` ve
+> `SECRET_KEY` yalnızca orada durur; `.gitignore` bu dosyayı dışarıda tutar. Depoya yalnızca yer tutuculu
+> `.env.example` girer.
+
+### Ortak adımlar (iki modda da)
+
+1. Projeyi indirip Python ortamını kurun ([Geliştirme ortamı kurulumu](#geliştirme-ortamı-kurulumu)).
+2. `.env.example` dosyasını `.env` olarak kopyalayın (Windows: `copy .env.example .env`).
+3. [Groq API anahtarı](https://console.groq.com/keys) alıp `GROQ_API_KEY`'e yazın. Boş kalırsa uygulama
+   çalışır, belge türü "Diğer" olur.
+4. Anahtarları üretip `.env`'e yazın:
+   ```bash
+   python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"   # ENCRYPTION_KEY
+   python -c "import secrets; print(secrets.token_hex(32))"                                    # SECRET_KEY
+   ```
+   `ENCRYPTION_KEY` bir kez üretilir ve **asla değiştirilmez**; kaybolursa belgeler çözülemez.
+
+### Yerel mod
+
+1. PostgreSQL 16 veya 17'yi kurun ([postgresql.org](https://www.postgresql.org/download/windows/));
+   `postgres` şifresini not edin. Tesseract OCR'yi Türkçe dil paketiyle kurun.
+2. Veritabanını oluşturun (tabloları uygulama ilk açılışta kendisi oluşturur):
+   ```sql
+   CREATE ROLE arcbase LOGIN PASSWORD '<guclu_bir_sifre>';
+   CREATE DATABASE arcbase OWNER arcbase ENCODING 'UTF8';
+   ```
+3. `.env` içinde şunları ayarlayın:
+   ```ini
+   YEREL_MOD=1
+   DATABASE_URL=postgresql://arcbase:<guclu_bir_sifre>@localhost:5432/arcbase
+   ```
+   `YEREL_MOD=1` iken `DATABASE_URL` bu bilgisayarı ya da yerel ağı göstermelidir; bulut adresiyle uygulama
+   başlamaz. Yerel modda `SECRET_KEY` zorunludur.
+4. `baslat.bat` dosyasına çift tıklayın ve http://127.0.0.1:5001 adresini açın. İlk kaydolan kullanıcı
+   yönetici olur.
+
+Adım adım ve teknik olmayan biri için hazırlanmış Windows rehberi (tarayıcı, otomatik başlatma, yedekleme,
+güvenlik duvarı): **[docs/KURULUM_KURUM.md](docs/KURULUM_KURUM.md)**. Yerel moda özgü özellikler için
+[Yerel mod (kurum kurulumu)](#yerel-mod-kurum-kurulumu) bölümüne bakın.
+
+### Bulut modu
+
+1. [Neon](https://neon.com) (ya da başka bir barındırılan PostgreSQL) hesabı açıp bir veritabanı oluşturun
+   ve bağlantı adresini kopyalayın.
+2. `.env` içinde bulut adresini yazın ve `YEREL_MOD`'u tanımlamayın (ya da boş bırakın):
+   ```ini
+   DATABASE_URL=postgresql://kullanici:sifre@host/neondb?sslmode=require
+   ```
+3. Yerelde denemek için `python app.py` (bkz. [Geliştirme ortamı kurulumu](#geliştirme-ortamı-kurulumu)).
+   İnternete açmak için: [Yayına alma (Render + Docker)](#yayına-alma-render--docker). Render'da ortam
+   değişkenleri panelden girilir; `.env` dosyası sunucuya gönderilmez.
+
+## Geliştirme ortamı kurulumu
 
 **Gereksinimler:** Python 3.10+, Tesseract OCR + Türkçe dil paketi (`tur.traineddata`),
 bir [Groq API anahtarı](https://console.groq.com/keys) ve bir PostgreSQL veritabanı
@@ -456,6 +535,9 @@ pip install -r requirements.txt
 | `GROQ_MODEL` | Opsiyonel, varsayılan `openai/gpt-oss-120b` |
 | `KULLANICI_BELGE_LIMITI` | Opsiyonel, kullanıcı başına belge sınırı (varsayılan 50) |
 | `TESSERACT_CMD` | Opsiyonel, Tesseract PATH'te değilse tam yolu |
+| `YEREL_MOD`, `HTTPS`, `YONETICI_KULLANICI`, `TARAMA_KLASORU`, `TARAYICI_WIA`, `VARSAYILAN_TARAMA_KLASORLERI`, `YEDEK_KLASORU`... | Yerel mod (kurum) ayarları; açıklamalarıyla `.env.example`'da, bkz. [Yerel mod](#yerel-mod-kurum-kurulumu) |
+
+Tüm değişkenlerin tam listesi için `.env.example` dosyasına bakın.
 
 > ⚠️ **`ENCRYPTION_KEY` bir kez üretilir ve asla değiştirilmez.** Kaybolursa veya değişirse
 > veritabanındaki tüm belgeler çözülemez hale gelir. Güvenli bir yere yedekleyin.
@@ -592,6 +674,79 @@ IP'sine göre çalışır).
   ```
   (Yerel HTTP'de `Secure` çerezler gönderilmediği için giriş yapabilmek adına `-e URETIM=0` ekleyin.)
 
+## Yerel mod (kurum kurulumu)
+
+Aynı kod iki şekilde çalışır; seçim `.env` ile yapılır:
+
+| | Bulut modu (varsayılan) | Yerel mod (`YEREL_MOD=1`) |
+|---|---|---|
+| Veritabanı | Neon (bulut PostgreSQL) | Kurumun bilgisayarındaki PostgreSQL |
+| Sunucu | Render, Docker, gunicorn | Windows, waitress (`baslat.bat` / `sunucu.py`) |
+| Dış bağlantı | Groq | **Yalnızca Groq** (yalnızca OCR metni) |
+| Tarayıcı entegrasyonu | — | İzlenen klasör + bağlı tarayıcıdan doğrudan tarama |
+
+Yeni ayarların hiçbiri verilmezse uygulama bugünkü gibi çalışır. Teknik olmayan biri için adım adım Windows
+kurulumu: **[docs/KURULUM_KURUM.md](docs/KURULUM_KURUM.md)**.
+
+- **Yerel mod koruması** (`yerel_mod.py`): `YEREL_MOD=1` iken `DATABASE_URL`'in sunucusu `localhost`,
+  `127.x`, `::1`, Unix soketi ya da özel ağ adresi (10.x, 172.16-31.x, 192.168.x, fc00::/7) olmalıdır. Bulut
+  adresiyle uygulama **başlamaz** ve nedenini yazar (adres ve şifre yazdırılmaz). Sunucu adları kabul
+  edilmez; yerel ağdaki veritabanı IP adresiyle yazılır. Yerel modda `SECRET_KEY` zorunludur.
+- **SSL**: bağlantı kodu SSL'i zorunlu tutmaz; `sslmode` yalnızca adreste yazılıysa uygulanır (Neon:
+  `?sslmode=require`, yerel: yok).
+- **Windows'ta çalıştırma**: gunicorn Windows'ta çalışmadığı için `sunucu.py` uygulamayı **waitress** ile
+  yerel ağda (`0.0.0.0:5001`) açar, açılışta şemayı hazırlar, arka plan işçisini ve klasör izlemeyi başlatır,
+  yerel ağ adreslerini (ör. `http://192.168.1.50:5001`) yazar. `baslat.bat` sanal ortamı kullanarak bunu
+  çalıştırır; `baslat.bat /otomatik` Görev Zamanlayıcı içindir (çıktı `logs\arcbase.log`). Linux/Docker'da
+  gunicorn aynen kalır.
+- **Çerezler**: yerel ağda HTTP kullanıldığı için yerel modda `Secure` çerez yalnızca `HTTPS=1` iken açıktır
+  (aksi halde tarayıcı çerezi göndermez, giriş yapılamaz). Render'da (`URETIM=1`) her zaman açıktır. Yerel
+  modda `X-Forwarded-For` başlığına güvenilmez (hız sınırı atlatılamaz).
+- **Dış kaynak yok**: yazı tipi (Inter, `static/fonts/`), ikonlar ve JavaScript uygulamayla
+  gelir; sayfalar hiçbir dış adrese (CDN, Google Fonts) istek atmaz. Bunu bir test doğrular.
+- **Yönetici ve Gelen belgeler**: `YONETICI_KULLANICI` ya da (boşsa) ilk kaydolan kullanıcı yöneticidir.
+  Tarama klasörüne sahipsiz düşen belgeler yöneticinin **Gelen belgeler** kutusuna (`/gelen`) gider; yönetici
+  bunları bir kullanıcıya atar ya da kendi arşivine alır. Atama belgenin `atama_gecmisi`'ne (kim, kime, ne
+  zaman) ve uygulama günlüğüne yazılır. Yönetici **başka kullanıcıların arşivlerini göremez**: kutudaki
+  belgelerin sahibi yöneticidir ama arşivine, sayaçlarına ve kotasına sayılmaz; atanınca sahibi değişir.
+- **İzlenen klasör** (`klasor_izleme.py`, `TARAMA_KLASORU`): watchdog + birkaç saniyelik yoklama (ağ
+  paylaşımları için). `Tarama\<kullanici>\` o kullanıcıya, kök `TARAMA_VARSAYILAN_KULLANICI`'ya ya da
+  yöneticinin Gelen belgeler kutusuna gider. Boyutu 3 sn sabit kalmayan (yazımı süren) dosya alınmaz. JPG,
+  PNG, PDF ve TIFF (tek sayfa → PNG, çok sayfa → tek PDF). Alınan dosya `islendi\YYYY-AA-GG\`, alınamayan
+  `hata\` altına (yanında nedeni yazan `.hata.txt`) taşınır; hiçbir dosya silinmez. Dosya önce taşınır,
+  sonra normal yüklemeyle aynı kuyruğa (`isleme.kuyruga_ekle`) eklenir; iki süreç aynı dosyayı alamaz.
+- **Doğrudan tarama** (`tarayici_wia.py`, Windows'ta varsayılan açık, `TARAYICI_WIA=0` kapatır): WIA
+  tarayıcı listesi (USB ve WSD ağ tarayıcıları) arka planda 3 saniyede bir yenilenir; sayfalar
+  `/tarayici/durum`'u sorar, yeni tarayıcıda "Tarayıcı bulundu" bildirimi ve "Tara" düğmesi çıkar. Tek
+  tuşla tarama: besleyicide kâğıt varsa tüm sayfalar, yoksa camdan sayfa sayfa ("Sonraki sayfa" / "Bitir",
+  sayfalar bellekte kullanıcı başına bekler). Hatalar sade Türkçe mesajdır; hata kodu yalnızca günlüğe
+  yazılır. Windows dışında modül yüklenmez, düğme görünmez. Testlerde WIA sahte COM nesneleriyle taklit edilir.
+- **Bilgisayardaki tarama klasörleri** (`klasor_izleme.VarsayilanKlasorIzleyici`): Windows'un varsayılan
+  tarama klasörleri ve "Tarama klasörleri" sayfasında eklenenler tek izleyiciyle izlenir; alınan dosya
+  `ArcBase'e aktarıldı\` altına taşınır. Klasör bulma/gezme (`klasor_secimi.py`) yalnızca yöneticiye ya da
+  sunucu bilgisayarının kendisinden (127.0.0.1) gelen isteğe açıktır; Windows sistem klasörleri listelenmez.
+- **Veri taşıma** (`scripts/veri_tasi.py`): Neon'daki (`DATABASE_URL`) kullanıcıları ve belgeleri yerel
+  veritabanına (`YEREL_DATABASE_URL`) id'leriyle kopyalar; şifreli içerik olduğu gibi taşınır (aynı
+  `ENCRYPTION_KEY` gerekir, betik bunu dener). Önce sayıları gösterir, hedef boş değilse durur, onay ister;
+  kopyadan sonra her satırın özetini iki tarafta karşılaştırır, uyuşmazsa hiçbir şey kaydedilmez.
+- **Yedekleme** (`scripts/yedekle.py`): `pg_dump` ile tarihli yedek (`YEDEK_KLASORU`), en son `YEDEK_SAYISI`
+  yedek tutulur. Windows Görev Zamanlayıcı ile günlük çalıştırma ve `ENCRYPTION_KEY`'in ayrıca saklanması
+  kurulum rehberindedir.
+
+## Veri akışı
+
+| Veri | Nerede | Dışarı gider mi? |
+|---|---|---|
+| Belge dosyaları (görsel, PDF) | PostgreSQL, Fernet ile şifreli | Hayır |
+| Kullanıcılar, şifre hash'leri, belge bilgileri, OCR metni | PostgreSQL | Hayır |
+| Tarama klasörü dosyaları (yerel mod) | `TARAMA_KLASORU` (`islendi\`, `hata\`), şifresiz | Hayır |
+| **OCR metni** (sınıflandırma ve bilgi çıkarma için) | — | **Evet, Groq API'ye (HTTPS)** |
+
+Uygulamanın dışarıya yaptığı **tek** bağlantı Groq API çağrısıdır (`classifier.py`). Groq'a yalnızca OCR
+metni gider; görsel, dosya ve veritabanı içeriği gitmez. OCR (Tesseract), görüntü düzeltme (OpenCV) ve
+PDF/Word/Excel üretimi sunucuda yapılır. Arayüz dış kaynak yüklemez. Bulut modunda veritabanı Neon'da
+(şifreli içerik), yerel modda kurumun bilgisayarındadır; yerel modda bulut veritabanıyla uygulama başlamaz.
+
 ## Dosya yapısı
 
 | Dosya | Görevi |
@@ -617,7 +772,17 @@ IP'sine göre çalışır).
 | `docs/once_sonra.py` | Kendi fotoğraflarınızdan README için tarama öncesi/sonrası görseli üretir |
 | `docs/hiz_olcumu.py` | İstek sürelerini parçalara ayırarak ölçer, iki ölçümü karşılaştırır |
 | `Dockerfile` | Tesseract + gunicorn içeren üretim imajı |
-| `gunicorn.conf.py` | Worker açılınca arka plan işçisini başlatır |
+| `gunicorn.conf.py` | Worker açılınca arka plan işçisini (ve ayarlıysa klasör izlemeyi) başlatır |
+| `yerel_mod.py` | `YEREL_MOD=1` koruması: veritabanı adresinin yerel/özel ağ olduğunu denetler |
+| `sunucu.py` · `baslat.bat` | Windows/yerel ağ sunucusu (waitress); açılışta hazırlık, yerel ağ adresleri |
+| `klasor_izleme.py` | İzlenen tarama klasörü (`TARAMA_KLASORU`) ve Windows'un varsayılan / eklenen tarama klasörleri: sahiplik, yazım bitince alma, TIFF, taşıma |
+| `tarayici_wia.py` | Bağlı tarayıcıyı algılama ve WIA ile tarama (Windows'ta varsayılan açık, `TARAYICI_WIA=0` kapatır) |
+| `klasor_secimi.py` | Tarayıcının kaydettiği klasörü bulma (son taranan dosya) ve sunucu klasörlerini gezme |
+| `izlenen_klasorler.py` | Sonradan eklenen/kaldırılan izlenen klasörlerin kaydı (`veri/izlenen_klasorler.json`) |
+| `tarama_gunlugu.py` | Son aktarılan dosyalar ve son tarama hataları (yöneticinin durum sayfası) |
+| `scripts/veri_tasi.py` · `scripts/yedekle.py` | Neon → yerel veri taşıma (doğrulamalı) · `pg_dump` ile tarihli yedek |
+| `docs/KURULUM_KURUM.md` | Kurum için adım adım Windows kurulum rehberi |
+| `static/fonts/`, `static/fonts.css` | Yerel yazı tipi (Inter, OFL) |
 
 ## Route'lar
 
@@ -643,6 +808,11 @@ IP'sine göre çalışır).
 | `GET /belge/<id>/koseler/otomatik` · `POST /belge/<id>/koseler` | Köşeleri yeniden algılama · elle köşe kaydetme (yeniden OCR) |
 | `POST /belge/<id>/yeniden-analiz` | Kayıtlı metni yeniden sınıflandırma ve bilgi çıkarma |
 | `POST /pdf-birlestir` | Seçilen belgeleri (en fazla 20) tek PDF'te birleştirme |
+| `GET /gelen` · `POST /gelen/<id>/ata` | Yöneticinin Gelen belgeler kutusu · belgeyi bir kullanıcıya (ya da kendi arşivine) atama |
+| `GET /tara` · `POST /tara` · `POST /tara/bitir` · `POST /tara/iptal` | Tek tuşla tarama (besleyicide tüm sayfalar; camda sayfa sayfa, "Bitir" ile tek belge) · vazgeçme (Windows) |
+| `GET /tarayici/durum` | Bağlı tarayıcılar, tarama ilerlemesi, bitirilmemiş sayfa sayısı (sayfalar birkaç saniyede bir sorar) |
+| `GET /tarama-durumu` | Yönetici: bağlı tarayıcılar, izlenen klasörler, son aktarılan dosyalar, son hatalar (yalnızca bilgi) |
+| `GET /klasorler` · `GET /klasorler/son-dosyalar` · `GET /klasorler/gez` · `POST /klasorler/ekle` · `POST /klasorler/kaldir` | Tarama klasörleri: son taranan belgeyi bulma, klasör gezme, ekleme/kaldırma (yalnızca yönetici ya da sunucu bilgisayarının kendisi) |
 
 Belge route'larının tamamı giriş gerektirir; başka kullanıcının belgesi istendiğinde 404 döner.
 
@@ -664,5 +834,12 @@ Telif hakkı © 2026 İbrahim Hakkı Evin.
 bir ağ hizmeti olarak kullanıcılara sunarsanız**, kaynak kodunu da aynı lisansla bu kullanıcılara açmanız
 gerekir. PDF işleme için kullanılan PyMuPDF de AGPL-3.0 lisanslıdır. Diğer Python bağımlılıklarının
 lisansları (MIT, MIT-CMU/HPND, BSD, Apache-2.0, LGPL-3.0, PSF-2.0, 0BSD, Zlib, CC0) ve arayüzde kullanılanlar
-(Tailwind CSS — MIT, derlenmiş CSS'teki lisans notu korunur; Lucide ikonları — ISC; Plus Jakarta Sans yazı
-tipi — OFL-1.1, Google Fonts'tan yüklenir) AGPL-3.0 ile uyumludur.
+(Tailwind CSS — MIT, derlenmiş CSS'teki lisans notu korunur; Lucide ikonları — ISC; Inter yazı
+tipi — OFL-1.1, `static/fonts/` içinde lisansıyla birlikte gelir) AGPL-3.0 ile uyumludur. Yerel mod
+paketleri: waitress (ZPL-2.1), watchdog (Apache-2.0), pywin32 (PSF-2.0).
+
+## Geliştirici
+
+- **Geliştirici:** İbrahim Hakkı Evin
+- **GitHub:** https://github.com/Abrahamexe
+- **Lisans:** AGPL-3.0, ayrıntılar yukarıdaki [Lisans](#lisans) bölümünde ([LICENSE](LICENSE)).

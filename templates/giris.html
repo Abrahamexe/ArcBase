@@ -9,7 +9,7 @@
       <span class="mb-5 flex h-12 w-12 items-center justify-center rounded-2xl bg-marka-50 text-marka-600 dark:bg-marka-500/15 dark:text-marka-300">
         {{ ui.ikon('giris', 'w-6 h-6') }}
       </span>
-      <h1 id="giris-baslik" class="text-2xl font-extrabold tracking-tight text-metin">Tekrar hoş geldiniz</h1>
+      <h1 id="giris-baslik" class="text-2xl font-semibold tracking-tight text-metin">Tekrar hoş geldiniz</h1>
       <p class="mt-1 text-sm text-metin-2">Arşivinize erişmek için giriş yapın.</p>
 
       <form action="{{ url_for('giris', next=request.args.get('next')) }}" method="post" class="mt-6 space-y-4" data-kimlik-formu>

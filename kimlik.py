@@ -26,6 +26,8 @@ class Kullanici(UserMixin):
         self.kullanici_adi = satir["kullanici_adi"]
         self.sifre_hash = satir["sifre_hash"]
         self.olusturma_tarihi = satir["olusturma_tarihi"]
+        # Gelen belgeler kutusunu yonetir; baska kullanicilarin arsivini goremez.
+        self.yonetici = bool(satir.get("yonetici"))
         # Istek basinda kullaniciyla ayni sorguda gelen sayaclar (menu, kota,
         # "bu hafta"); giris/kayit aninda olusturulan nesnede yoktur (None).
         self.sayaclar = satir.get("sayaclar")

@@ -1,8 +1,9 @@
 {# Flash mesajlari; hem uygulama sayfalari (base.html) hem giris/kayit gibi
-   genel sayfalar (_genel_duzen.html) kullanir. #}
+   genel sayfalar (_genel_duzen.html) kullanir. Sag alttan kayarak gelir,
+   ust uste yigilir (style.css: .bildirim-yigini). #}
 {% import "_bilesenler.html" as ui with context %}
 {% with mesajlar = get_flashed_messages(with_categories=true) %}
-  <div class="pointer-events-none fixed inset-x-4 top-20 z-[70] flex flex-col items-end gap-2 sm:inset-x-auto sm:right-6"
+  <div class="bildirim-yigini"
        aria-live="polite" data-bildirimler>
     {% for tur_adi, mesaj in mesajlar %}
       <div role="{{ 'alert' if tur_adi == 'hata' else 'status' }}" data-bildirim

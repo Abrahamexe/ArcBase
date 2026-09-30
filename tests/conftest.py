@@ -101,9 +101,11 @@ def uygulama(veritabani):
 
 
 @pytest.fixture(autouse=True)
-def _temiz_durum(monkeypatch):
-    """Her testte hiz siniri kapali ve sifirlanmis, CSRF kapali baslar.
+def _temiz_durum(monkeypatch, tmp_path_factory):
+    """Her testte hiz siniri kapali ve sifirlanmis, CSRF kapali baslar; eklenen
+    izlenen klasorler gecici bir dosyaya yazilir (izlenen_klasorler.py).
     Veritabanina baglanmaz: saf goruntu testleri veritabanisiz da calisir."""
+    monkeypatch.setenv("IZLENEN_KLASORLER_DOSYASI", str(tmp_path_factory.mktemp("ayar") / "izlenen_klasorler.json"))
     limiter = uygulama_modulu.limiter
     limiter.reset()
     limiter.enabled = False

@@ -20,18 +20,21 @@
   {% set gorunum_adresi = url_for('tarama_onizleme', belge_id=belge.id, v=belge.icerik_surumu, mod=gorunum_modu) %}
 {% endif %}
 
-<nav aria-label="Konum" class="kart-giris mb-5 flex min-w-0 items-center gap-1.5 text-sm text-metin-3" style="--i: 0">
-  <a href="{{ url_for('index') }}" class="shrink-0 font-medium transition-colors hover:text-metin">Panel</a>
-  {{ ui.ikon('sag', 'w-3.5 h-3.5 shrink-0') }}
-  <a href="{{ url_for('kategori', tur=belge.tur) }}" class="shrink-0 font-medium transition-colors hover:text-metin">{{ turler[belge.tur].ad }}</a>
-  {{ ui.ikon('sag', 'w-3.5 h-3.5 shrink-0') }}
-  <span class="truncate font-semibold text-metin-2">{{ belge.dosya_adi }}</span>
-</nav>
+{% set sifreli_isareti %}
+  <span class="inline-flex items-center gap-1 rounded-md border border-cizgi bg-kart px-2 py-0.5 text-xs font-medium text-metin-2"
+        title="Belge ve önizlemeleri veritabanında şifrelenmiş olarak saklanır." data-sifreli-isareti>
+    {{ ui.ikon('kilit', 'w-3.5 h-3.5') }}Şifreli saklanıyor
+  </span>
+{% endset %}
+{% call ui.sayfa_basligi([('Arşiv', none), (turler[belge.tur].ad, url_for('kategori', tur=belge.tur)), (belge.dosya_adi, none)],
+                         belge.dosya_adi, '', sifreli_isareti) %}
+  <a href="{{ url_for('indir', belge_id=belge.id) }}" download class="btn btn-ikincil">{{ ui.ikon('indir', 'w-4 h-4') }}İndir</a>
+{% endcall %}
 
 <div class="grid grid-cols-1 gap-6 lg:grid-cols-5">
 
   {# ------------------------------------------------------------ onizleme #}
-  <section class="kart-giris lg:col-span-3" style="--i: 1" aria-label="Belge önizlemesi" data-tarama
+  <section class="bolum-giris lg:col-span-3" style="--i: 1" aria-label="Belge önizlemesi" data-tarama
            data-adres="{{ url_for('tarama_onizleme', belge_id=belge.id, v=belge.icerik_surumu) }}">
     <div class="rounded-2xl border border-cizgi bg-kart p-3 shadow-kart sm:p-4">
       {% if not pdf_mi and not isleniyor %}
@@ -58,7 +61,8 @@
         </div>
       {% endif %}
       <div class="relative">
-        <button type="button" data-isik-kutusu-ac
+        {# data-isleniyor: islem surerken uzerinden tarayici isigi gecer (etkiler.css); bitince etkiler.js netlestirir. #}
+        <button type="button" data-isik-kutusu-ac {% if isleniyor %}data-isleniyor{% endif %}
                 class="onizleme-cercevesi iskelet group relative block min-h-[16rem] w-full overflow-hidden rounded-xl bg-yuzey
                        focus:outline-none focus-visible:ring-2 focus-visible:ring-marka-500"
                 aria-label="Tam ekran önizlemeyi aç">
@@ -139,9 +143,24 @@
 
   {# ------------------------------------------------------------ bilgiler #}
   <div class="space-y-4 lg:col-span-2">
+    {% if belge.gelen_kutusu %}
+      {# Yoneticinin Gelen belgeler kutusu: belge henuz kimsenin arsivinde degil. #}
+      <section class="bolum-giris rounded-2xl border border-marka-200 bg-marka-50/70 p-5 shadow-kart dark:border-marka-500/30 dark:bg-marka-500/10"
+               style="--i: 2" data-gelen-belge>
+        <p class="flex items-center gap-2 text-sm font-bold text-metin">{{ ui.ikon('gelen', 'w-4 h-4 text-marka-600') }}Gelen belgeler kutusunda</p>
+        <p class="mt-1 text-xs text-metin-2">Tarayıcıdan sahipsiz geldi. İlgili kullanıcıya atayın ya da kendi arşivinize alın.</p>
+        {{ ui.atama_formu(belge.id, atama_kullanicilari, 'mt-3') }}
+      </section>
+    {% elif belge.atama_gecmisi %}
+      {% set atama = belge.atama_gecmisi[-1] %}
+      <p class="bolum-giris flex items-center gap-2 rounded-xl border border-cizgi bg-kart px-4 py-2.5 text-xs text-metin-2 shadow-kart" style="--i: 2" data-atama-bilgisi>
+        {{ ui.ikon('gelen', 'w-4 h-4 shrink-0 text-metin-3') }}
+        <span>Gelen belgelerden atandı: <span class="font-semibold text-metin">{{ atama.yapan }}</span> → <span class="font-semibold text-metin">{{ atama.kime }}</span>, {{ atama.zaman[:16] | replace('T', ' ') }} (UTC)</span>
+      </p>
+    {% endif %}
     {% if isleniyor %}
       {# Arka planda isleniyor: app.js durumu yoklar, bitince sayfayi yeniler. #}
-      <section class="kart-giris rounded-2xl border border-marka-200 bg-marka-50/70 p-5 shadow-kart dark:border-marka-500/30 dark:bg-marka-500/10"
+      <section class="bolum-giris rounded-2xl border border-marka-200 bg-marka-50/70 p-5 shadow-kart dark:border-marka-500/30 dark:bg-marka-500/10"
                style="--i: 2" data-belge-isleniyor="{{ belge.id }}" aria-live="polite">
         <p class="flex items-center gap-2 text-sm font-bold text-metin"><span class="donen-halka donen-kucuk" aria-hidden="true"></span>Belge işleniyor</p>
         <ol class="mt-3 space-y-1.5 text-sm text-metin-2">
@@ -156,7 +175,7 @@
         <p class="mt-3 text-xs text-metin-3">Beklemeniz gerekmiyor; sayfa hazır olunca kendiliğinden güncellenir.</p>
       </section>
     {% elif isleme_hatasi %}
-      <section class="kart-giris rounded-2xl border border-rose-200 bg-rose-50/70 p-5 shadow-kart dark:border-rose-500/30 dark:bg-rose-500/10" style="--i: 2" data-isleme-hatasi>
+      <section class="bolum-giris rounded-2xl border border-rose-200 bg-rose-50/70 p-5 shadow-kart dark:border-rose-500/30 dark:bg-rose-500/10" style="--i: 2" data-isleme-hatasi>
         <p class="flex items-center gap-2 text-sm font-bold text-metin">{{ ui.ikon('hata', 'w-4 h-4 text-rose-600') }}Belge işlenemedi</p>
         <p class="mt-1 text-xs text-metin-2">{{ isleme_hatasi }}</p>
         <form action="{{ url_for('yeniden_isle', belge_id=belge.id) }}" method="post" class="mt-3" data-kimlik-formu>
@@ -166,7 +185,7 @@
       </section>
     {% endif %}
     {% if isleme_uyarilari %}
-      <section class="kart-giris rounded-2xl border border-amber-200 bg-amber-50/70 p-5 shadow-kart dark:border-amber-500/30 dark:bg-amber-500/10" style="--i: 2" data-isleme-uyarilari>
+      <section class="bolum-giris rounded-2xl border border-amber-200 bg-amber-50/70 p-5 shadow-kart dark:border-amber-500/30 dark:bg-amber-500/10" style="--i: 2" data-isleme-uyarilari>
         <p class="flex items-center gap-2 text-sm font-bold text-metin">{{ ui.ikon('uyari', 'w-4 h-4 text-amber-600') }}İşlenirken dikkat edilmesi gerekenler</p>
         <ul class="mt-1 space-y-1 text-xs text-metin-2">
           {% for uyari in isleme_uyarilari %}<li>{{ uyari }}</li>{% endfor %}
@@ -175,7 +194,7 @@
     {% endif %}
     {% if kirpma_kontrol and kose_ayarlanabilir %}
       {# Kose algilama emin degildi: kose editorunu acan baglanti (kirpma kaydedilince kalkar). #}
-      <section class="kart-giris rounded-2xl border border-orange-200 bg-orange-50/70 p-5 shadow-kart dark:border-orange-500/30 dark:bg-orange-500/10" style="--i: 2" data-kirpma-kontrol>
+      <section class="bolum-giris rounded-2xl border border-orange-200 bg-orange-50/70 p-5 shadow-kart dark:border-orange-500/30 dark:bg-orange-500/10" style="--i: 2" data-kirpma-kontrol>
         <p class="flex items-center gap-2 text-sm font-bold text-metin">{{ ui.ikon('kirp', 'w-4 h-4 text-orange-600') }}Kırpma otomatik algılandı ama emin olunamadı</p>
         <p class="mt-1 text-xs text-metin-2">Kâğıdın kenarları tam seçilmemiş olabilir; köşeleri kontrol edip gerekirse sürükleyerek düzeltin.</p>
         <a href="{{ url_for('belge', belge_id=belge.id, koseler=1) }}" class="btn btn-ikincil mt-3 h-9 px-3 text-xs">{{ ui.ikon('kirp', 'w-4 h-4') }}Kırpmayı kontrol et</a>
@@ -184,7 +203,7 @@
     {% if not isleniyor %}
     {# Siniflandirma yapilamamis belge (orn. o an servise ulasilamadi): tek tikla yeniden dene. #}
     {% if not yeniden_analiz_oner and belge.guven == 0 and belge.ocr_metni and not belge.elle_duzeltildi %}
-      <section class="kart-giris rounded-2xl border border-amber-200 bg-amber-50/70 p-5 shadow-kart dark:border-amber-500/30 dark:bg-amber-500/10" style="--i: 2" data-yeniden-dene>
+      <section class="bolum-giris rounded-2xl border border-amber-200 bg-amber-50/70 p-5 shadow-kart dark:border-amber-500/30 dark:bg-amber-500/10" style="--i: 2" data-yeniden-dene>
         <p class="flex items-center gap-2 text-sm font-bold text-metin">{{ ui.ikon('uyari', 'w-4 h-4 text-amber-600') }}Belgenin türü belirlenemedi</p>
         <p class="mt-1 text-xs text-metin-2">
           Yükleme sırasında belge incelenemedi. Metni okundu; türünü ve bilgilerini şimdi yeniden belirleyebiliriz.
@@ -198,7 +217,7 @@
       </section>
     {% endif %}
     {% if yeniden_analiz_oner %}
-      <section class="kart-giris rounded-2xl border border-marka-200 bg-marka-50/70 p-5 shadow-kart dark:border-marka-500/30 dark:bg-marka-500/10" style="--i: 2" data-yeniden-analiz-onerisi>
+      <section class="bolum-giris rounded-2xl border border-marka-200 bg-marka-50/70 p-5 shadow-kart dark:border-marka-500/30 dark:bg-marka-500/10" style="--i: 2" data-yeniden-analiz-onerisi>
         <p class="flex items-center gap-2 text-sm font-bold text-metin">{{ ui.ikon('yildiz', 'w-4 h-4 text-marka-600') }}Kırpma kaydedildi</p>
         <p class="mt-1 text-xs text-metin-2">
           Belgenin türünü ve bilgilerini yeni haline göre güncellemek ister misiniz? Elle düzelttikleriniz değişmez.
@@ -212,32 +231,32 @@
       </section>
     {% endif %}
 
-    <section class="kart-giris rounded-2xl border border-cizgi bg-kart p-5 shadow-kart sm:p-6" style="--i: 2">
+    <section class="bolum-giris rounded-2xl border border-cizgi bg-kart p-5 shadow-kart sm:p-6" style="--i: 2">
       <div class="mb-4 flex items-start gap-3">
         <span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl {{ ui.renk(belge.tur, 'kutu') }}">
           {{ ui.tur_ikonu(belge.tur, 'w-6 h-6') }}
         </span>
-        <h1 class="min-w-0 break-words pt-0.5 text-lg font-bold leading-snug tracking-tight text-metin">{{ belge.dosya_adi }}</h1>
+        <p class="min-w-0 break-words pt-0.5 text-base font-semibold leading-snug text-metin">{{ belge.dosya_adi }}</p>
       </div>
 
       <div class="mb-5 flex flex-wrap gap-1.5">
         {{ ui.tur_rozeti(belge.tur) }}
         {% if belge.elle_duzeltildi %}{{ ui.elle_rozeti() }}{% endif %}
         {% if belge.otomatik_duzeltildi %}
-          <span class="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ring-inset bg-teal-50 text-teal-700 ring-teal-600/20 dark:bg-teal-400/10 dark:text-teal-300 dark:ring-teal-400/25"
+          <span class="inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-xs font-medium ring-1 ring-inset bg-teal-50 text-teal-700 ring-teal-600/20 dark:bg-teal-400/10 dark:text-teal-300 dark:ring-teal-400/25"
                 title="Fotoğraftaki belge otomatik olarak kırpılıp düzeltildi">
             {{ ui.ikon('sihir', 'w-3.5 h-3.5') }}Otomatik düzeltildi
           </span>
         {% endif %}
         {% if belge.orijinal_saklandi and belge.koseler and not belge.otomatik_duzeltildi %}
-          <span class="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ring-inset bg-teal-50 text-teal-700 ring-teal-600/20 dark:bg-teal-400/10 dark:text-teal-300 dark:ring-teal-400/25"
+          <span class="inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-xs font-medium ring-1 ring-inset bg-teal-50 text-teal-700 ring-teal-600/20 dark:bg-teal-400/10 dark:text-teal-300 dark:ring-teal-400/25"
                 title="Kırpma köşeleri elle ayarlandı">
             {{ ui.ikon('kirp', 'w-3.5 h-3.5') }}Kırpma elle ayarlandı
           </span>
         {% endif %}
         {% if taranmis %}
           {# Tarayici ciktisi algilandi; yanlissa kose editoruyle elle kirpilabilir. #}
-          {% set rozet_sinifi = "inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ring-inset bg-yuzey text-metin-2 ring-cizgi" %}
+          {% set rozet_sinifi = "inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-xs font-medium ring-1 ring-inset bg-yuzey text-metin-2 ring-cizgi" %}
           {% if kose_ayarlanabilir %}
             <a href="{{ url_for('belge', belge_id=belge.id, koseler=1) }}" class="{{ rozet_sinifi }}" data-taranmis-rozeti
                title="Tarayıcı çıktısı algılandı, kâğıt kırpılmadı. Yanlışsa köşeleri elle ayarlayabilirsiniz.">
@@ -296,7 +315,7 @@
     {# ------------------------------------------------------------ belge bilgileri
        Tanimlar alanlar.ALANLAR'dan gelir; bilgiler: sutunlar + alanlar JSONB birlesimi. #}
     {% set girdi = 'h-10 w-full rounded-xl border border-cizgi bg-kart px-3 text-sm text-metin shadow-kart placeholder:text-metin-3 transition focus:border-marka-500 focus:outline-none focus:ring-4 focus:ring-marka-500/15' %}
-    <section id="bilgiler" class="kart-giris scroll-mt-24 rounded-2xl border border-cizgi bg-kart p-5 shadow-kart sm:p-6" style="--i: 3" aria-labelledby="bilgi-baslik" data-bilgi-karti>
+    <section id="bilgiler" class="bolum-giris scroll-mt-24 rounded-2xl border border-cizgi bg-kart p-5 shadow-kart sm:p-6" style="--i: 3" aria-labelledby="bilgi-baslik" data-bilgi-karti>
       <div class="mb-2 flex items-start justify-between gap-3">
         <div>
           <h2 id="bilgi-baslik" class="text-sm font-bold text-metin">Belge bilgileri</h2>
@@ -358,7 +377,7 @@
     </section>
 
     {# ------------------------------------------------------------ tur duzeltme #}
-    <section class="kart-giris rounded-2xl border border-cizgi bg-kart p-5 shadow-kart sm:p-6" style="--i: 4" aria-labelledby="tur-baslik">
+    <section class="bolum-giris rounded-2xl border border-cizgi bg-kart p-5 shadow-kart sm:p-6" style="--i: 4" aria-labelledby="tur-baslik">
       <h2 id="tur-baslik" class="text-sm font-bold text-metin">Belge türünü düzelt</h2>
       <p class="mb-4 mt-0.5 text-xs text-metin-3">Yanlış sınıflandırıldıysa doğru türü seçip kaydedin.</p>
       <form action="{{ url_for('turu_degistir', belge_id=belge.id) }}" method="post" data-tur-formu>
@@ -388,7 +407,7 @@
 
     {# ------------------------------------------------------------ islemler #}
     {% set pdf_modu = gorunum_modu if gorunum_modu in pdf_modlari else 'renkli' %}
-    <section class="kart-giris grid grid-cols-1 gap-2 rounded-2xl border border-cizgi bg-kart p-4 shadow-kart sm:grid-cols-2" style="--i: 5" aria-label="İşlemler">
+    <section class="bolum-giris grid grid-cols-1 gap-2 rounded-2xl border border-cizgi bg-kart p-4 shadow-kart sm:grid-cols-2" style="--i: 5" aria-label="İşlemler">
       {% if not isleniyor %}
       {# PDF indir: secili tarama moduyla aranabilir A4 PDF; menude diger modlar. #}
       <div class="relative flex sm:col-span-2">
@@ -430,7 +449,7 @@
 
 {# ------------------------------------------------------------ OCR metni #}
 {% if not isleniyor %}
-<section class="kart-giris mt-6 rounded-2xl border border-cizgi bg-kart shadow-kart" style="--i: 6" data-ocr aria-labelledby="ocr-baslik">
+<section class="bolum-giris mt-6 rounded-2xl border border-cizgi bg-kart shadow-kart" style="--i: 6" data-ocr aria-labelledby="ocr-baslik">
   <div class="flex flex-wrap items-center justify-between gap-3 border-b border-cizgi px-5 py-4 sm:px-6">
     <div class="flex items-center gap-3">
       <span class="flex h-9 w-9 items-center justify-center rounded-xl bg-yuzey text-metin-2">{{ ui.ikon('tara', 'w-[18px] h-[18px]') }}</span>

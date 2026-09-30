@@ -1,0 +1,320 @@
+/* ArcBase — gorsel etkiler (yalnizca gorunum; davranisa dokunmaz).
+   Kaynak: docs/vitrin (numaralar oraya gore). Her etki uygulamada tek yerde kullanilir:
+     1 renkli menu karolari · 2 acilir alt menu + agac cizgisi · 3 kayan gosterge rengi
+     4 menu hiyerarsisi · 5 menu aurorasi        (kenar menu)
+     6 spotlight (yalniz Kategoriler izgarasi) · 7 kenar isini (yalniz hizli yukleme karti)
+     8 tarama isigi (yalniz islenen belgenin kucuk resmi) · 9 metin cikarma (belge metni)
+     10 morph (belge karti -> belge onizlemesi) · 11 bulanik giris (sayfa bolumleri)
+     12 sayac ve cubuklar · 13 karsilama · 14 yukleme ucusu · 15 miknatisli dugme (yalniz Panel)
+   Hareket kurali: gecisler 300-800 ms, yumusak cikis egrisi, ziplama/sallanma yok; mumkun
+   oldugunca yalnizca transform/opacity/filter. Surekli akan arka plan isiklari (5, 7, 13)
+   ambiyans oldugu icin uzun surer. prefers-reduced-motion acikken hepsi durur. */
+
+@property --h { syntax: '<number>'; inherits: true; initial-value: 250; }
+
+:root {
+  --egri-io: cubic-bezier(0.65, 0, 0.35, 1);
+  --ag-1: oklch(0.78 0.13 275 / 0.7);
+  --ag-2: oklch(0.86 0.1 195 / 0.55);
+  --ag-3: oklch(0.84 0.11 335 / 0.5);
+  --ag-4: oklch(0.9 0.1 75 / 0.5);
+  --au-1: oklch(0.82 0.11 275 / 0.9);
+  --au-2: oklch(0.86 0.09 195 / 0.8);
+  --au-3: oklch(0.85 0.1 335 / 0.8);
+}
+html.dark {
+  --ag-1: oklch(0.5 0.2 275 / 0.5);
+  --ag-2: oklch(0.55 0.14 195 / 0.32);
+  --ag-3: oklch(0.5 0.2 335 / 0.3);
+  --ag-4: oklch(0.6 0.14 60 / 0.18);
+  --au-1: oklch(0.5 0.16 275 / 0.7);
+  --au-2: oklch(0.55 0.12 195 / 0.55);
+  --au-3: oklch(0.5 0.16 335 / 0.5);
+}
+
+/* ================================================================== 11 bulanik giris
+   Sayfanin ana bolumleri (baslik, ozet, kategoriler...) bulanik ve saydamdan, sirayla netlesir.
+   Kartlar ve liste satirlari bunu kullanmaz (kart-giris'in hafif yukselmesi kalir). */
+@keyframes bolum-gir { from { opacity: 0; filter: blur(12px); transform: translateY(10px); } }
+.bolum-giris { animation: bolum-gir 700ms var(--yumusak) backwards; animation-delay: calc(min(var(--i, 0), 10) * 90ms + 60ms); }
+
+/* ================================================================== 1 renkli menu karolari
+   Her ogenin kendi rengi ve ikonu var ama dusuk doygunlukta: acik zeminli, ince halkali karo.
+   Aktif ve ustune gelinen ogede biraz canlanir. --h: renk acisi, --kroma: 1 (renkli) / .25 (notr). */
+.kenar-nav .menu-ikon, .spot-karo {
+  --k: var(--kroma, 1);
+  width: 1.75rem; height: 1.75rem; border-radius: 8px;
+  background: oklch(0.955 calc(0.03 * var(--k)) var(--h));
+  color: oklch(0.5 calc(0.13 * var(--k)) var(--h));
+  box-shadow: inset 0 0 0 1px oklch(0.86 calc(0.05 * var(--k)) var(--h) / 0.55);
+  transition: background-color 300ms ease, color 300ms ease, box-shadow 300ms ease, transform 300ms var(--yumusak);
+}
+html.dark .kenar-nav .menu-ikon, html.dark .spot-karo {
+  background: oklch(0.34 calc(0.055 * var(--k)) var(--h) / 0.6);
+  color: oklch(0.82 calc(0.09 * var(--k)) var(--h));
+  box-shadow: inset 0 0 0 1px oklch(0.6 calc(0.08 * var(--k)) var(--h) / 0.3);
+}
+.kenar-nav .menu-ogesi:hover .menu-ikon, .kenar-nav .menu-ogesi[aria-current="page"] .menu-ikon {
+  transform: none;
+  background: oklch(0.92 calc(0.065 * var(--k)) var(--h));
+  color: oklch(0.44 calc(0.16 * var(--k)) var(--h));
+  box-shadow: inset 0 0 0 1px oklch(0.78 calc(0.09 * var(--k)) var(--h) / 0.6);
+}
+html.dark .kenar-nav .menu-ogesi:hover .menu-ikon, html.dark .kenar-nav .menu-ogesi[aria-current="page"] .menu-ikon {
+  background: oklch(0.42 calc(0.09 * var(--k)) var(--h) / 0.75);
+  color: oklch(0.9 calc(0.1 * var(--k)) var(--h));
+  box-shadow: inset 0 0 0 1px oklch(0.7 calc(0.1 * var(--k)) var(--h) / 0.4);
+}
+.kenar-nav .menu-ikon svg, .spot-karo svg { width: 0.9375rem; height: 0.9375rem; }
+.kenar-nav .menu-ikon .rozet-nokta { top: -3px; right: -3px; }
+
+/* ================================================================== 4 hiyerarsi */
+.kenar-nav .menu-ogesi { height: auto; min-height: 2.5rem; padding: 0.3125rem 0.5rem; gap: 0.75rem; }
+.menu-metin { display: flex; min-width: 0; flex: 1; flex-direction: column; line-height: 1.25; }
+.menu-ad { font-size: 0.84375rem; }
+.menu-alt { margin-top: 1px; font-size: 0.71875rem; font-weight: 400; color: rgb(var(--metin-3)); }
+.menu-ogesi[aria-current="page"] .menu-alt { color: rgb(var(--metin-2)); }
+.grup-basligi { height: 1.5rem; font-size: 0.65625rem; letter-spacing: 0.16em; }
+.menu-grubu + .menu-grubu { margin-top: 1.375rem; }
+.kenar-nav .alt-liste .menu-ogesi { min-height: 2rem; padding: 0.1875rem 0.5rem; gap: 0.625rem; }
+.kenar-nav .alt-liste .menu-ikon { width: 1.375rem; height: 1.375rem; border-radius: 6px; }
+.kenar-nav .alt-liste .menu-ikon svg { width: 0.8125rem; height: 0.8125rem; }
+html.kenar-dar .kenar-nav .menu-ogesi { padding: 0.3125rem 0; justify-content: center; }
+html.kenar-dar .kenar-nav .alt-liste .menu-ogesi { padding: 0.1875rem 0; }
+html.kenar-dar .menu-metin { display: none; }
+/* Daraltinca kapali gruplarin ikonlari hemen gorunur: gruplarin kapanma/acilma gecisindeki
+   bekleme (visibility gecikmesi) ve yukseklik animasyonu dar modda uygulanmaz. */
+html.kenar-dar .grup-icerik:not(.alt-liste-sarici) { transition: opacity 160ms ease, visibility 0s; }
+html.kenar-dar .kenar-nav .menu-rozet, html.kenar-dar .kenar-nav .menu-sayac { padding: 0; min-width: 0; margin: 0; }
+
+/* ================================================================== 3 kayan gosterge rengi
+   Gosterge (style.css .aktif-gosterge) aktif ogenin tonunu alir; app.js --h yazar. */
+.aktif-gosterge {
+  --h: 250;
+  background: oklch(0.965 0.022 var(--h) / 0.96);
+  box-shadow: 0 0 0 1px oklch(0.86 0.05 var(--h) / 0.6), 0 4px 14px -6px oklch(0.6 0.12 var(--h) / 0.35);
+}
+html.dark .aktif-gosterge {
+  background: oklch(0.4 0.06 var(--h) / 0.3);
+  box-shadow: inset 0 0 0 1px oklch(0.7 0.08 var(--h) / 0.28), 0 6px 18px -8px oklch(0.6 0.12 var(--h) / 0.5);
+}
+
+/* ================================================================== 2 acilir alt menu
+   Alt ogeler sirayla hafif kayarak belirir; ince dikey agac cizgisi aktif alt ogede renklenir.
+   Yukseklik animasyonu style.css .grup-icerik'te (grid 0fr <-> 1fr). */
+.alt-liste { position: relative; margin-left: 1.375rem; padding-left: 1rem; border-left: 0; }
+.alt-liste::before, .alt-liste::after {
+  content: ""; position: absolute; left: 0; top: 0; width: 1px; height: calc(100% - 1rem);
+  background: var(--k-cizgi, rgb(var(--cizgi)));
+}
+.alt-liste::after {
+  background: oklch(0.66 0.13 var(--h)); box-shadow: 0 0 8px oklch(0.7 0.13 var(--h) / 0.45);
+  transform-origin: top; transform: scaleY(var(--dolgu, 0));
+  animation: agac-dol 600ms var(--yumusak) 200ms backwards;
+}
+@keyframes agac-dol { from { transform: scaleY(0); } }
+.alt-liste .menu-ogesi::before {
+  content: ""; position: absolute; left: -1rem; top: 50%; width: 0.625rem; height: 1px;
+  background: var(--k-cizgi, rgb(var(--cizgi))); transition: background-color 400ms ease;
+}
+.alt-liste .menu-ogesi[aria-current="page"]::before { background: oklch(0.66 0.13 var(--h)); }
+.alt-liste .menu-ogesi {
+  opacity: 0; transform: translateX(-10px);
+  transition: opacity 300ms ease, transform 300ms var(--yumusak), background-color 200ms ease, color 200ms ease;
+}
+.grup-icerik:not([data-kapali]) .alt-liste .menu-ogesi {
+  opacity: 1; transform: none;
+  transition: opacity 450ms var(--yumusak) calc(var(--i, 0) * 45ms + 140ms), transform 500ms var(--yumusak) calc(var(--i, 0) * 45ms + 140ms),
+              background-color 200ms ease, color 200ms ease;
+}
+html.kenar-dar .alt-liste { margin-left: 0; padding-left: 0; }
+html.kenar-dar .alt-liste::before, html.kenar-dar .alt-liste::after, html.kenar-dar .alt-liste .menu-ogesi::before { display: none; }
+html.kenar-dar .alt-liste .menu-ogesi { opacity: 1; transform: none; }
+
+/* ================================================================== 5 aurora */
+.kenar > .aurora { position: absolute; inset: 0; z-index: 0; overflow: hidden; pointer-events: none; }
+.kenar > *:not(.aurora) { position: relative; z-index: 1; }
+.aurora i { position: absolute; width: 18rem; height: 18rem; border-radius: 50%; opacity: 0.4; will-change: transform; }
+.aurora i:nth-child(1) { left: -8rem; top: -4rem; background: radial-gradient(closest-side, var(--au-1), transparent); animation: aurora-1 26s ease-in-out infinite alternate; }
+.aurora i:nth-child(2) { left: -3rem; top: 38%; background: radial-gradient(closest-side, var(--au-2), transparent); animation: aurora-2 32s ease-in-out infinite alternate; }
+.aurora i:nth-child(3) { right: -10rem; bottom: 4%; background: radial-gradient(closest-side, var(--au-3), transparent); animation: aurora-3 38s ease-in-out infinite alternate; }
+@keyframes aurora-1 { to { transform: translate3d(5rem, 8rem, 0) scale(1.15); } }
+@keyframes aurora-2 { to { transform: translate3d(7rem, -6rem, 0) scale(0.9); } }
+@keyframes aurora-3 { to { transform: translate3d(-7rem, -7rem, 0) scale(1.2); } }
+
+/* ================================================================== 13 karsilama */
+.karsilama {
+  position: relative; isolation: isolate; overflow: hidden; margin-bottom: 1.5rem; min-height: 13.5rem;
+  border-radius: 1.5rem; border: 1px solid rgb(var(--cizgi)); background: rgb(var(--kart));
+}
+.karsilama-ag { position: absolute; inset: -20%; z-index: -2; }
+.karsilama-ag i { position: absolute; border-radius: 50%; will-change: transform; }
+.karsilama-ag i:nth-child(1) { width: 60%; height: 90%; left: 4%; top: 0; background: radial-gradient(closest-side, var(--ag-1), transparent); animation: ag-1 19s ease-in-out infinite alternate; }
+.karsilama-ag i:nth-child(2) { width: 50%; height: 80%; left: 44%; top: 10%; background: radial-gradient(closest-side, var(--ag-2), transparent); animation: ag-2 23s ease-in-out infinite alternate; }
+.karsilama-ag i:nth-child(3) { width: 46%; height: 78%; left: 20%; top: 30%; background: radial-gradient(closest-side, var(--ag-3), transparent); animation: ag-3 27s ease-in-out infinite alternate; }
+.karsilama-ag i:nth-child(4) { width: 40%; height: 70%; left: 62%; top: 34%; background: radial-gradient(closest-side, var(--ag-4), transparent); animation: ag-4 21s ease-in-out infinite alternate; }
+@keyframes ag-1 { to { transform: translate3d(22%, 12%, 0) scale(1.15); } }
+@keyframes ag-2 { to { transform: translate3d(-26%, 10%, 0) scale(0.9); } }
+@keyframes ag-3 { to { transform: translate3d(24%, -14%, 0) scale(1.1); } }
+@keyframes ag-4 { to { transform: translate3d(-20%, -16%, 0) scale(1.2); } }
+.karsilama-gren {
+  position: absolute; inset: 0; z-index: -1; opacity: 0.08; mix-blend-mode: overlay; pointer-events: none;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+}
+.karsilama::after { content: ""; position: absolute; inset: 0; z-index: -1; background: linear-gradient(180deg, transparent 45%, rgb(var(--kart) / 0.55)); }
+.karsilama-ic { display: flex; align-items: flex-end; justify-content: space-between; gap: 1.5rem; flex-wrap: wrap; min-height: 13.5rem; padding: clamp(1.25rem, 3vw, 2.25rem); }
+.karsilama-tarih { margin-bottom: 0.75rem; font-size: 0.75rem; font-weight: 550; letter-spacing: 0.14em; text-transform: uppercase; color: rgb(var(--metin-2)); }
+.karsilama-baslik { font-size: clamp(2rem, 4.8vw, 3.75rem); font-weight: 600; letter-spacing: -0.04em; line-height: 1.02; color: rgb(var(--metin)); overflow-wrap: anywhere; }
+.karsilama-baslik > span { display: inline-block; margin-right: 0.2em; padding-block: 0.16em; margin-block: -0.16em; animation: bolum-gir 800ms var(--yumusak) backwards; }
+.karsilama-baslik > span:nth-child(1) { animation-delay: 200ms; }
+.karsilama-baslik > span:nth-child(2) { animation-delay: 340ms; }
+.karsilama-ad { background: linear-gradient(100deg, rgb(var(--metin)) 25%, rgb(var(--marka))); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.karsilama-ozet { display: flex; flex-wrap: wrap; align-items: center; gap: 0.25rem 0.625rem; margin-top: 0.875rem; font-size: 0.9375rem; color: rgb(var(--metin-2)); animation: bolum-gir 800ms var(--yumusak) 500ms backwards; }
+.karsilama-nokta { width: 6px; height: 6px; border-radius: 50%; background: #3fb68b; box-shadow: 0 0 0 4px rgb(63 182 139 / 0.2); }
+
+/* ================================================================== panel yerlesimi */
+.panel-ust { display: grid; gap: 1rem; grid-template-columns: minmax(0, 1fr); }
+.panel-sayilar { display: grid; gap: 1rem; grid-template-columns: minmax(0, 1fr); grid-auto-rows: 1fr; }
+@media (min-width: 640px) and (max-width: 1023.98px) { .panel-sayilar { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (min-width: 1024px) { .panel-ust { grid-template-columns: minmax(0, 1fr) minmax(0, 2fr); } }
+.nasil-adimlar { display: grid; gap: 1.25rem; grid-template-columns: minmax(0, 1fr); padding: 0; margin: 0; list-style: none; }
+@media (min-width: 768px) { .nasil-adimlar { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+
+/* Tarayici bilgi kutusu (Panel): ayni istatistik kutulari gibi; durum noktasi bagliysa yesil. */
+.tarayici-ozet { display: flex; align-items: center; gap: 0.625rem; font-size: 1.75rem; font-weight: 600; letter-spacing: -0.03em; line-height: 2.5rem; color: rgb(var(--metin)); }
+.tarayici-nokta { width: 0.625rem; height: 0.625rem; flex: none; border-radius: 50%; background: rgb(var(--metin-3) / 0.5); transition: background-color 400ms ease, box-shadow 400ms ease; }
+.tarayici-karti[data-durum="bagli"] .tarayici-nokta { background: #3fb68b; box-shadow: 0 0 0 4px rgb(63 182 139 / 0.2); }
+.tarayici-karti[data-durum="yok"] .tarayici-nokta { background: #d9a94a; box-shadow: 0 0 0 4px rgb(217 169 74 / 0.18); }
+
+/* ================================================================== 7 kenar isini
+   Ana eylem kartinin (Hizli yukleme) kenarinda yavasca dolasan ince isik; yalniz transform. */
+.kenar-isini { position: relative; isolation: isolate; overflow: hidden; border-radius: 1rem; padding: 1px; background: rgb(var(--cizgi)); box-shadow: 0 1px 2px rgb(16 24 40 / 0.04); }
+.kenar-isini::before {
+  content: ""; position: absolute; left: 50%; top: 50%; z-index: -1; width: 130%; aspect-ratio: 1; will-change: transform;
+  background: conic-gradient(from 0deg, transparent 0 292deg, oklch(0.72 0.16 268 / 0) 292deg, oklch(0.62 0.2 268) 336deg, oklch(0.8 0.12 215) 358deg, transparent 360deg);
+  transform: translate(-50%, -50%) rotate(0deg); animation: kenar-isini 7s linear infinite;
+}
+html.dark .kenar-isini::before { background: conic-gradient(from 0deg, transparent 0 292deg, oklch(0.72 0.16 268 / 0) 292deg, oklch(0.78 0.16 240) 336deg, oklch(0.95 0.06 200) 358deg, transparent 360deg); }
+@keyframes kenar-isini { to { transform: translate(-50%, -50%) rotate(360deg); } }
+.kenar-isini-ic { position: relative; z-index: 1; border-radius: calc(1rem - 1px); background: rgb(var(--kart)); padding: 1.5rem; height: 100%; }
+
+/* ================================================================== 6 spotlight (Kategoriler)
+   Imlec kartlarin ustunde gezerken yumusak isik ve kenarlikta parlama; komsu kartlarin kenari da yanar.
+   Isik daireleri yalniz transform ile tasinir (etkiler.js). */
+.spot-alani { display: grid; gap: 0.75rem; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+@media (max-width: 479.98px) { .spot-alani { grid-template-columns: minmax(0, 1fr); } }
+@media (min-width: 900px) { .spot-alani { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+.spot-kart {
+  position: relative; display: flex; flex-direction: column; justify-content: space-between; gap: 1.5rem; min-height: 9.75rem;
+  padding: 1.125rem; overflow: hidden; border-radius: 1rem; border: 1px solid rgb(var(--cizgi)); background: rgb(var(--kart));
+  box-shadow: 0 1px 2px rgb(16 24 40 / 0.04); text-decoration: none;
+  transition: transform 300ms var(--yumusak), box-shadow 300ms var(--yumusak);
+  animation: icerik-gir 500ms var(--yumusak) backwards; animation-delay: calc(min(var(--i, 0), 8) * 60ms + 250ms);
+}
+.spot-kart:hover { transform: translateY(-2px); box-shadow: 0 14px 30px -14px rgb(16 24 40 / 0.22); }
+.spot-kart:focus-visible { outline: 2px solid rgb(var(--marka) / 0.7); outline-offset: 2px; }
+.spot-isik, .spot-halka { position: absolute; inset: 0; border-radius: inherit; pointer-events: none; opacity: 0; overflow: hidden; transition: opacity 500ms var(--yumusak); }
+.spot-halka {
+  padding: 1px; -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); mask-composite: exclude;
+}
+.spot-isik i, .spot-halka i { position: absolute; left: 0; top: 0; border-radius: 50%; will-change: transform; }
+.spot-isik i { width: 360px; height: 360px; margin: -180px 0 0 -180px; background: radial-gradient(closest-side, oklch(0.8 0.11 var(--h) / 0.2), transparent); }
+.spot-halka i { width: 300px; height: 300px; margin: -150px 0 0 -150px; background: radial-gradient(closest-side, oklch(0.7 0.15 var(--h) / 0.95), transparent 85%); }
+html.dark .spot-halka i { background: radial-gradient(closest-side, oklch(0.85 0.13 var(--h) / 0.95), transparent 85%); }
+.spot-alani.spot-acik .spot-isik, .spot-alani.spot-acik .spot-halka { opacity: 1; }
+.spot-ust { position: relative; display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; }
+.spot-tarih { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 0.71875rem; color: rgb(var(--metin-3)); }
+.spot-alt { position: relative; display: block; }
+.spot-ad { display: block; margin-bottom: 0.375rem; font-size: 0.84375rem; font-weight: 600; color: rgb(var(--metin)); }
+.spot-sayi { display: flex; align-items: baseline; gap: 0.375rem; }
+.spot-sayi b { font-size: 1.875rem; font-weight: 600; letter-spacing: -0.04em; line-height: 1; color: rgb(var(--metin)); }
+.spot-sayi small { font-size: 0.75rem; color: rgb(var(--metin-3)); }
+/* 12: dagilim cubugu, sayfa acilinca soldan dolar (transform) */
+.spot-cubuk { display: block; height: 4px; margin-top: 0.875rem; overflow: hidden; border-radius: 2px; background: rgb(var(--metin) / 0.07); }
+.spot-cubuk i { display: block; height: 100%; border-radius: inherit; transform-origin: left; transform: scaleX(var(--oran, 0));
+  background: linear-gradient(90deg, oklch(0.68 0.13 var(--h)), oklch(0.78 0.12 var(--h)));
+  animation: cubuk-buyu 700ms var(--yumusak) backwards; animation-delay: calc(min(var(--i, 0), 8) * 70ms + 450ms); }
+@keyframes cubuk-buyu { from { transform: scaleX(0); } }
+
+/* ================================================================== 8 tarama isigi (imza)
+   Islenen belgenin kucuk resminde (kart ve belge onizlemesi) tarayici isigi yukaridan asagi
+   gider; belge bulanik ve soluk kalir. Bitince etkiler.js resmi netlestirir. Tek kullanim yeri. */
+.belge-karti[data-isleniyor] .iskelet img, .onizleme-cercevesi[data-isleniyor] img {
+  filter: blur(3px) saturate(0.6) contrast(0.9);
+}
+.belge-karti[data-isleniyor] .iskelet::after, .onizleme-cercevesi[data-isleniyor]::after {
+  content: ""; position: absolute; inset: 0; z-index: 3; pointer-events: none; will-change: transform;
+  background: linear-gradient(to top, oklch(0.86 0.12 195 / 0.38), transparent 42%);
+  border-bottom: 2px solid oklch(0.96 0.04 190);
+  box-shadow: 0 6px 16px -2px oklch(0.85 0.13 190 / 0.85), 0 14px 34px -4px oklch(0.75 0.15 200 / 0.5);
+  animation: tarama-gecis 800ms var(--egri-io) infinite alternate;
+}
+@keyframes tarama-gecis { from { transform: translateY(-100%); } to { transform: translateY(0); } }
+.tarama-netles { animation: netles 800ms var(--egri-io) both; }
+@keyframes netles { from { filter: blur(5px) saturate(0.6); opacity: 0.85; } to { filter: none; opacity: 1; } }
+/* belge onizlemesinde bitis: net kopya isikla birlikte yukaridan asagi acilir (etkiler.js) */
+.tarama-acilim { position: absolute; inset: 0; z-index: 2; overflow: hidden; pointer-events: none; }
+.tarama-acilim img { position: absolute; max-width: none; filter: none !important; transform: none; }
+.tarama-cizgisi { position: absolute; left: 0; right: 0; top: 0; z-index: 3; height: 2px; pointer-events: none; will-change: transform;
+  background: linear-gradient(90deg, transparent, oklch(0.9 0.1 190) 20%, #fff 50%, oklch(0.9 0.1 190) 80%, transparent);
+  box-shadow: 0 0 12px 2px oklch(0.85 0.13 190 / 0.9), 0 0 36px 6px oklch(0.75 0.15 200 / 0.6); }
+/* biten kartta rozet yerine oturur */
+.belge-karti.netlesiyor .iskelet img { animation: netles 800ms var(--egri-io) both; }
+.belge-karti.netlesiyor .p-4 > div:last-child > :first-child { animation: rozet-otur 600ms var(--yumusak) 250ms backwards; }
+@keyframes rozet-otur { from { opacity: 0; filter: blur(8px); transform: translateY(6px) scale(0.94); } }
+
+/* ================================================================== 9 metin cikarma (belge metni)
+   OCR metninin satirlari bulanik ve saydamdan, sirayla netlesir (etkiler.js satirlari sarar;
+   textContent degismez). Sayfa acilinca metin gorununce bir kez. */
+.ocr-satir { display: inline-block; width: 100%; vertical-align: top; }
+.ocr-kutu.ocr-hazir:not(.ocr-oynat) .ocr-satir { opacity: 0; }
+.ocr-kutu.ocr-oynat .ocr-satir { animation: ocr-belir 700ms var(--yumusak) backwards; animation-delay: calc(min(var(--i, 0), 14) * 80ms); }
+@keyframes ocr-belir { from { opacity: 0; filter: blur(8px); transform: translateY(4px); } }
+
+/* ================================================================== 10 morph
+   Belge kartinin kucuk resmi (tiklaninca etkiler.js ad verir) belge sayfasindaki buyuk
+   onizlemeye donusur (View Transitions, sayfalar arasi). */
+.onizleme-cercevesi { view-transition-name: belge-gorsel; }
+html.tema-gecisi .onizleme-cercevesi { view-transition-name: none; }
+::view-transition-group(belge-gorsel) { animation-duration: 650ms; animation-timing-function: cubic-bezier(0.65, 0, 0.2, 1); }
+::view-transition-old(belge-gorsel), ::view-transition-new(belge-gorsel) { animation-duration: 650ms; }
+
+/* ================================================================== 14 yukleme ucusu */
+.ucus-karti { position: fixed; left: 0; top: 0; z-index: 95; pointer-events: none; will-change: transform; }
+.ucus-ic {
+  display: flex; align-items: center; max-width: 16rem; padding: 0.5rem 0.875rem; border-radius: 10px;
+  border: 1px solid rgb(var(--cizgi)); background: rgb(var(--kart)); will-change: transform;
+  box-shadow: 0 18px 34px -16px rgb(16 24 40 / 0.45); font-size: 0.8125rem; font-weight: 550; color: rgb(var(--metin));
+}
+.ucus-ic span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.karo-vurgu { animation: karo-yan 700ms var(--yumusak) both; }
+@keyframes karo-yan {
+  0% { box-shadow: 0 0 0 0 oklch(0.75 0.14 var(--h) / 0.65), inset 0 0 0 1px oklch(0.78 0.09 var(--h) / 0.6); }
+  100% { box-shadow: 0 0 0 10px oklch(0.75 0.14 var(--h) / 0), inset 0 0 0 1px oklch(0.78 0.09 var(--h) / 0.6); }
+}
+
+/* ================================================================== tema gecisi
+   Acik/koyu tema degisirken yeni tema sol ustten sag alta dogru, genis ve yumusak kenarli capraz
+   bir silmeyle kayarak gelir (View Transitions; app.js tema dugmesi). Eski goruntu yerinde durur.
+   Akici olmasi icin gecis boyunca: (1) ogelerin kendi renk gecisleri kapatilir (yeni tema ilk
+   karesinden son haliyle yakalanir, renkler silme sirasinda ayrica solmaz), (2) surekli akan arka
+   plan isiklari durdurulur (her karede yeniden cizilmezler). */
+html.tema-gecisi *, html.tema-gecisi *::before, html.tema-gecisi *::after { transition: none !important; }
+html.tema-gecisi .aurora i, html.tema-gecisi .karsilama-ag i, html.tema-gecisi .kenar-isini::before,
+html.tema-gecisi .belge-karti[data-isleniyor] .iskelet::after, html.tema-gecisi .onizleme-cercevesi[data-isleniyor]::after { animation-play-state: paused; }
+html.tema-gecisi::view-transition-old(root) { animation: none; mix-blend-mode: normal; }
+html.tema-gecisi::view-transition-new(root) {
+  animation: tema-sil 800ms cubic-bezier(0.45, 0, 0.55, 1) both; mix-blend-mode: normal;
+  -webkit-mask-image: linear-gradient(135deg, #000 0 40%, transparent 60% 100%); mask-image: linear-gradient(135deg, #000 0 40%, transparent 60% 100%);
+  -webkit-mask-size: 300% 300%; mask-size: 300% 300%; -webkit-mask-repeat: no-repeat; mask-repeat: no-repeat;
+}
+@keyframes tema-sil { from { -webkit-mask-position: 100% 100%; mask-position: 100% 100%; } to { -webkit-mask-position: 0 0; mask-position: 0 0; } }
+
+/* ================================================================== hareket azaltma */
+@media (prefers-reduced-motion: reduce) {
+  .aurora i, .karsilama-ag i, .kenar-isini::before { animation: none; }
+  .belge-karti[data-isleniyor] .iskelet::after, .onizleme-cercevesi[data-isleniyor]::after { display: none; }
+  .ocr-kutu.ocr-hazir:not(.ocr-oynat) .ocr-satir { opacity: 1; }
+  .tarama-acilim, .tarama-cizgisi, .ucus-karti { display: none; }
+}

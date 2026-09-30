@@ -8,6 +8,12 @@
 {# ---------------------------------------------------------------- ikonlar
    Lucide ikon seti (ISC lisansi), 24x24 cizgi ikonlar. #}
 {% set IKONLAR = {
+  'asagi': '<path d="m6 9 6 6 6-6"/>',
+  'secici': '<path d="m7 15 5 5 5-5"/><path d="m7 9 5-5 5 5"/>',
+  'isleniyor': '<path d="M21 12a9 9 0 1 1-6.219-8.56"/>',
+  'enter': '<path d="M9 10 4 15l5 5"/><path d="M20 4v7a4 4 0 0 1-4 4H4"/>',
+  'sag': '<path d="m9 18 6-6-6-6"/>',
+  'etiketler': '<path d="m15 5 6.3 6.3a2.4 2.4 0 0 1 0 3.4L17 19"/><path d="M9.586 5.586A2 2 0 0 0 8.172 5H3a1 1 0 0 0-1 1v5.172a2 2 0 0 0 .586 1.414L8.29 18.29a2.426 2.426 0 0 0 3.42 0l3.58-3.58a2.426 2.426 0 0 0 0-3.42z"/><circle cx="6.5" cy="9.5" r=".5" fill="currentColor"/>',
   'panel': '<rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/>',
   'ara': '<circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/>',
   'ara-yok': '<circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/><path d="m13.5 8.5-5 5"/><path d="m8.5 8.5 5 5"/>',
@@ -62,10 +68,12 @@
   'sihir': '<path d="m21.64 3.64-1.28-1.28a1.21 1.21 0 0 0-1.72 0L2.36 18.64a1.21 1.21 0 0 0 0 1.72l1.28 1.28a1.2 1.2 0 0 0 1.72 0L21.64 5.36a1.2 1.2 0 0 0 0-1.72"/><path d="m14 7 3 3"/><path d="M5 6v4"/><path d="M19 14v4"/><path d="M10 2v2"/><path d="M7 8H3"/><path d="M21 16h-4"/><path d="M11 3H9"/>',
   'karsilastir': '<rect width="18" height="18" x="3" y="3" rx="2"/><path d="M12 3v18"/>',
   'kirp': '<path d="M6 2v14a2 2 0 0 0 2 2h14"/><path d="M18 22V8a2 2 0 0 0-2-2H2"/>',
+  'tarayici': '<path d="M5 12V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v7"/><rect width="20" height="8" x="2" y="12" rx="2"/><path d="M6 16h.01M10 16h8"/>',
+  'gelen': '<polyline points="22 12 16 12 14 15 10 15 8 12 2 12"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/>',
   'goz': '<path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0"/><circle cx="12" cy="12" r="3"/>',
 } %}
 
-{% macro ikon(ad, sinif="w-5 h-5", kalinlik="1.8") -%}
+{% macro ikon(ad, sinif="w-5 h-5", kalinlik="1.75") -%}
   <svg class="{{ sinif }}" viewBox="0 0 24 24" fill="none" stroke="currentColor"
        stroke-width="{{ kalinlik }}" stroke-linecap="round" stroke-linejoin="round"
        aria-hidden="true" focusable="false">{{ (IKONLAR[ad] or IKONLAR['dosya']) | safe }}</svg>
@@ -81,34 +89,34 @@
    rozet: kucuk etiket · kutu: ikon arka plani · nokta: tek renkli isaret #}
 {% set RENKLER = {
   'amber': {
-    'rozet': 'bg-amber-50 text-amber-700 ring-amber-600/20 dark:bg-amber-400/10 dark:text-amber-300 dark:ring-amber-400/25',
-    'kutu': 'bg-amber-100 text-amber-700 dark:bg-amber-400/15 dark:text-amber-300',
-    'nokta': 'bg-amber-500',
+    'rozet': 'bg-amber-50/70 text-amber-900/70 ring-amber-700/15 dark:bg-amber-300/10 dark:text-amber-100/80 dark:ring-amber-300/15',
+    'kutu': 'bg-amber-50 text-amber-700/75 dark:bg-amber-300/10 dark:text-amber-200/75',
+    'nokta': 'bg-amber-400/70 dark:bg-amber-300/60',
   },
   'indigo': {
-    'rozet': 'bg-violet-50 text-violet-700 ring-violet-600/20 dark:bg-violet-400/10 dark:text-violet-300 dark:ring-violet-400/25',
-    'kutu': 'bg-violet-100 text-violet-700 dark:bg-violet-400/15 dark:text-violet-300',
-    'nokta': 'bg-violet-500',
+    'rozet': 'bg-violet-50/70 text-violet-900/70 ring-violet-700/15 dark:bg-violet-300/10 dark:text-violet-100/80 dark:ring-violet-300/15',
+    'kutu': 'bg-violet-50 text-violet-700/75 dark:bg-violet-300/10 dark:text-violet-200/75',
+    'nokta': 'bg-violet-400/70 dark:bg-violet-300/60',
   },
   'emerald': {
-    'rozet': 'bg-emerald-50 text-emerald-700 ring-emerald-600/20 dark:bg-emerald-400/10 dark:text-emerald-300 dark:ring-emerald-400/25',
-    'kutu': 'bg-emerald-100 text-emerald-700 dark:bg-emerald-400/15 dark:text-emerald-300',
-    'nokta': 'bg-emerald-500',
+    'rozet': 'bg-emerald-50/70 text-emerald-900/70 ring-emerald-700/15 dark:bg-emerald-300/10 dark:text-emerald-100/80 dark:ring-emerald-300/15',
+    'kutu': 'bg-emerald-50 text-emerald-700/75 dark:bg-emerald-300/10 dark:text-emerald-200/75',
+    'nokta': 'bg-emerald-400/70 dark:bg-emerald-300/60',
   },
   'sky': {
-    'rozet': 'bg-sky-50 text-sky-700 ring-sky-600/20 dark:bg-sky-400/10 dark:text-sky-300 dark:ring-sky-400/25',
-    'kutu': 'bg-sky-100 text-sky-700 dark:bg-sky-400/15 dark:text-sky-300',
-    'nokta': 'bg-sky-500',
+    'rozet': 'bg-sky-50/70 text-sky-900/70 ring-sky-700/15 dark:bg-sky-300/10 dark:text-sky-100/80 dark:ring-sky-300/15',
+    'kutu': 'bg-sky-50 text-sky-700/75 dark:bg-sky-300/10 dark:text-sky-200/75',
+    'nokta': 'bg-sky-400/70 dark:bg-sky-300/60',
   },
   'rose': {
-    'rozet': 'bg-rose-50 text-rose-700 ring-rose-600/20 dark:bg-rose-400/10 dark:text-rose-300 dark:ring-rose-400/25',
-    'kutu': 'bg-rose-100 text-rose-700 dark:bg-rose-400/15 dark:text-rose-300',
-    'nokta': 'bg-rose-500',
+    'rozet': 'bg-rose-50/70 text-rose-900/70 ring-rose-700/15 dark:bg-rose-300/10 dark:text-rose-100/80 dark:ring-rose-300/15',
+    'kutu': 'bg-rose-50 text-rose-700/75 dark:bg-rose-300/10 dark:text-rose-200/75',
+    'nokta': 'bg-rose-400/70 dark:bg-rose-300/60',
   },
   'slate': {
-    'rozet': 'bg-slate-100 text-slate-700 ring-slate-500/20 dark:bg-slate-400/10 dark:text-slate-300 dark:ring-slate-400/25',
-    'kutu': 'bg-slate-100 text-slate-600 dark:bg-slate-400/15 dark:text-slate-300',
-    'nokta': 'bg-slate-400',
+    'rozet': 'bg-slate-100/70 text-slate-700 ring-slate-500/15 dark:bg-slate-300/10 dark:text-slate-300 dark:ring-slate-300/15',
+    'kutu': 'bg-slate-100 text-slate-600 dark:bg-slate-300/10 dark:text-slate-300',
+    'nokta': 'bg-slate-400/70',
   },
 } %}
 
@@ -116,34 +124,42 @@
   {{- (RENKLER[turler[kod].renk] or RENKLER['slate'])[parca] -}}
 {%- endmacro %}
 
+{# Menu karolarinin ve kategori kartlarinin tonu: renk halkasindaki aci (etkiler.css --h).
+   Yeni bir tur eklenirse notr tona duser. #}
+{% set TUR_TONLARI = {'fatura': 80, 'sozlesme': 305, 'kimlik': 150, 'dilekce': 215, 'resmi_yazi': 20, 'diger': 260} %}
+{% macro tur_tonu(kod) -%}
+  {{- TUR_TONLARI.get(kod, 260) -}}
+{%- endmacro %}
+
 {# ---------------------------------------------------------------- rozetler #}
 {% macro tur_rozeti(kod, ekstra="") -%}
-  <span class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ring-inset {{ renk(kod, 'rozet') }} {{ ekstra }}">
+  <span class="inline-flex items-center gap-1.5 rounded-md px-2 py-0.5 text-xs font-medium ring-1 ring-inset {{ renk(kod, 'rozet') }} {{ ekstra }}">
     {{ tur_ikonu(kod, "w-3.5 h-3.5") }}{{ turler[kod].ad }}
   </span>
 {%- endmacro %}
 
 {% macro dusuk_guven_rozeti(ekstra="") -%}
-  <span class="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ring-inset bg-orange-50 text-orange-700 ring-orange-600/20 dark:bg-orange-400/10 dark:text-orange-300 dark:ring-orange-400/25 {{ ekstra }}">
+  <span class="inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-xs font-medium ring-1 ring-inset bg-orange-50 text-orange-700 ring-orange-600/20 dark:bg-orange-400/10 dark:text-orange-300 dark:ring-orange-400/25 {{ ekstra }}">
     {{ ikon('uyari', "w-3.5 h-3.5") }}Kontrol edilmeli
   </span>
 {%- endmacro %}
 
-{# Arka planda OCR/siniflandirma suren belge (app.js durumu yoklar). #}
+{# Arka planda OCR/siniflandirma suren belge (app.js durumu yoklar). Rozet hafifce
+   nabiz atar; belge hazir olunca app.js rozeti yumusakca "Tamamlandi"ya cevirir. #}
 {% macro isleme_rozeti(ekstra="") -%}
-  <span class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ring-inset bg-marka-50 text-marka-700 ring-marka-600/20 dark:bg-marka-400/10 dark:text-marka-300 dark:ring-marka-400/25 {{ ekstra }}">
-    <span class="donen-halka donen-kucuk" aria-hidden="true"></span>İşleniyor
+  <span class="isleme-rozeti inline-flex items-center gap-1.5 rounded-md px-2 py-0.5 text-xs font-medium ring-1 ring-inset bg-marka-50 text-marka-700 ring-marka-600/20 dark:bg-marka-400/10 dark:text-marka-300 dark:ring-marka-400/25 {{ ekstra }}" data-isleme-rozeti>
+    <span class="nabiz-nokta" aria-hidden="true"></span><span data-rozet-metni>İşleniyor</span>
   </span>
 {%- endmacro %}
 
 {% macro isleme_hatasi_rozeti(ekstra="") -%}
-  <span class="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ring-inset bg-rose-50 text-rose-700 ring-rose-600/20 dark:bg-rose-400/10 dark:text-rose-300 dark:ring-rose-400/25 {{ ekstra }}">
+  <span class="inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-xs font-medium ring-1 ring-inset bg-rose-50 text-rose-700 ring-rose-600/20 dark:bg-rose-400/10 dark:text-rose-300 dark:ring-rose-400/25 {{ ekstra }}">
     {{ ikon('hata', "w-3.5 h-3.5") }}İşlenemedi
   </span>
 {%- endmacro %}
 
 {% macro elle_rozeti() -%}
-  <span class="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ring-inset bg-yuzey text-metin-2 ring-cizgi">
+  <span class="inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-xs font-medium ring-1 ring-inset bg-yuzey text-metin-2 ring-cizgi">
     {{ ikon('kalem', "w-3.5 h-3.5") }}Elle düzeltildi
   </span>
 {%- endmacro %}
@@ -209,21 +225,63 @@
   </a>
 {%- endmacro %}
 
+{# ---------------------------------------------------------------- gelen belge atama
+   Yoneticinin Gelen belgeler kutusundaki belgeyi bir kullaniciya (ya da kendi
+   arsivine) atama formu; gelen.html ve belge.html kullanir. #}
+{% macro atama_formu(belge_id, kullanicilar, sinif="") -%}
+  <form action="{{ url_for('gelen_ata', belge_id=belge_id) }}" method="post" class="flex items-center gap-2 {{ sinif }}" data-atama-formu>
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <label for="ata-{{ belge_id }}" class="sr-only">Atanacak kullanıcı</label>
+    <select id="ata-{{ belge_id }}" name="kullanici" required
+            class="h-9 min-w-0 flex-1 rounded-xl border border-cizgi bg-kart px-2 text-xs font-semibold text-metin">
+      <option value="">Kullanıcı seçin…</option>
+      {% for k in kullanicilar %}
+        <option value="{{ k.id }}">{{ k.kullanici_adi }}{% if k.id == current_user.id %} (kendi arşivim){% endif %}</option>
+      {% endfor %}
+    </select>
+    <button type="submit" class="btn btn-birincil h-9 shrink-0 px-3 text-xs">{{ ikon('tik', 'w-4 h-4', '2.4') }}Ata</button>
+  </form>
+{%- endmacro %}
+
 {# ---------------------------------------------------------------- bos durum #}
 {# ton: ton-buz | ton-gunes | ton-pembe | ton-nane (style.css) #}
 {% macro bos_durum(ikon_adi, baslik, aciklama, eylem="", ton="ton-buz") -%}
-  <div class="bos-durum kart-giris flex flex-col items-center justify-center rounded-2xl border border-dashed border-cizgi bg-kart px-6 py-14 text-center">
-    <span class="bos-durum-sahne mb-5" aria-hidden="true">
-      <span class="bos-durum-hale {{ ton }}"></span>
-      <span class="bos-durum-ikon renkli-ikon {{ ton }}">{{ ikon(ikon_adi, "w-8 h-8") }}</span>
-      <span class="bos-parilti p1">{{ ikon('yildiz', 'w-3.5 h-3.5') }}</span>
-      <span class="bos-parilti p2">{{ ikon('yildiz', 'w-2.5 h-2.5') }}</span>
-      <span class="bos-parilti p3"></span>
+  <div class="bos-durum flex flex-col items-center justify-center rounded-xl border border-dashed border-cizgi bg-kart px-6 py-12 text-center">
+    <span class="bos-durum-sahne mb-4" aria-hidden="true">
+      <span class="bos-durum-ikon">{{ ikon(ikon_adi, "w-6 h-6") }}</span>
     </span>
     <p class="font-semibold text-metin">{{ baslik }}</p>
     <p class="mt-1 max-w-sm text-sm text-metin-2">{{ aciklama }}</p>
     {% if eylem %}<div class="mt-5">{{ eylem }}</div>{% endif %}
   </div>
+{%- endmacro %}
+
+{# ---------------------------------------------------------------- sayfa basligi
+   Her sayfada ayni yapi: konum yolu (breadcrumb), baslik, kisa aciklama ve
+   sagda sayfanin ana eylem butonlari (caller ile verilir).
+   konum: [(ad, adres), ...]; son oge bulunulan sayfadir (adres None olabilir).
+   Kullanim:  {% call ui.sayfa_basligi([('Arşiv', none), ('Fatura', none)], 'Fatura', 'Açıklama') %}...{% endcall %}
+   Eylem yoksa: {{ ui.sayfa_basligi(konum, baslik, aciklama) }} #}
+{% macro sayfa_basligi(konum, baslik, aciklama="", baslik_ek="") -%}
+  <header class="sayfa-baslik bolum-giris flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between" data-sayfa-basligi>
+    <div class="min-w-0">
+      {% if konum %}
+        <nav aria-label="Konum" class="konum-yolu mb-2">
+          {% for ad, adres in konum %}
+            {% if not loop.first %}<span class="konum-ayirici" aria-hidden="true">/</span>{% endif %}
+            {% if adres and not loop.last %}<a href="{{ adres }}">{{ ad }}</a>
+            {% else %}<span {% if loop.last %}aria-current="page" class="text-metin-2"{% endif %}>{{ ad }}</span>{% endif %}
+          {% endfor %}
+        </nav>
+      {% endif %}
+      <div class="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1">
+        <h1 class="min-w-0 break-words text-2xl font-semibold text-metin">{{ baslik }}</h1>
+        {{ baslik_ek }}
+      </div>
+      {% if aciklama %}<p class="mt-1 max-w-2xl text-sm text-metin-2">{{ aciklama }}</p>{% endif %}
+    </div>
+    {% if caller %}<div class="flex shrink-0 flex-wrap items-center gap-2">{{ caller() }}</div>{% endif %}
+  </header>
 {%- endmacro %}
 
 {# ---------------------------------------------------------------- sayfalama
@@ -270,7 +328,7 @@
 {% macro suzgec_formu(eylem, suzgec, gizli={}, tutar=false) -%}
   {% set aktif = suzgec | length %}
   {% set girdi = 'h-10 w-full rounded-xl border border-cizgi bg-kart px-3 text-sm text-metin shadow-kart placeholder:text-metin-3 transition focus:border-marka-500 focus:outline-none focus:ring-4 focus:ring-marka-500/15' %}
-  <details class="suzgec kart-giris mb-6 rounded-2xl border border-cizgi bg-kart shadow-kart" style="--i: 2" {% if aktif %}open{% endif %}>
+  <details class="suzgec bolum-giris mb-6 rounded-2xl border border-cizgi bg-kart shadow-kart" style="--i: 2" {% if aktif %}open{% endif %}>
     <summary class="flex cursor-pointer list-none items-center gap-2 px-4 py-3 text-sm font-semibold text-metin">
       {{ ikon('filtre', 'w-4 h-4 text-metin-3') }}Filtrele ve sırala
       {% if aktif %}<span class="rounded-full bg-marka-600 px-2 py-0.5 text-[11px] font-bold text-white">{{ aktif }}</span>{% endif %}

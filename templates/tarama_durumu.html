@@ -1,0 +1,94 @@
+{% extends "base.html" %}
+{% import "_bilesenler.html" as ui with context %}
+{% block baslik %}Tarama durumu — ArcBase{% endblock %}
+
+{% block icerik %}
+{# Yonetici icin yalnizca bilgi: bagli tarayicilar, izlenen klasorler, son
+   aktarilan dosyalar ve son hatalar (tarama_gunlugu.py; uygulama yeniden
+   baslayinca bosalir). Hicbir ayar degistirilmez. #}
+{% call ui.sayfa_basligi([('Yönetim', none), ('Tarama durumu', none)], 'Tarama durumu',
+                        'Tarayıcıların ve izlenen klasörlerin durumu. Bu sayfada bir şey ayarlamanız gerekmez.') %}
+  {% if klasor_yonetimi_izinli %}<a href="{{ url_for('klasorler') }}" class="btn btn-ikincil">{{ ui.ikon('klasor', 'w-4 h-4') }}Tarama klasörleri</a>{% endif %}
+{% endcall %}
+
+{% set kart = "kart-giris rounded-2xl border border-cizgi bg-kart p-5 shadow-kart sm:p-6" %}
+{% set baslik = "mb-3 text-base font-bold text-metin" %}
+<div class="grid grid-cols-1 gap-5 lg:grid-cols-2">
+
+  <section class="{{ kart }}" style="--i: 2" data-durum-tarayicilar>
+    <h2 class="{{ baslik }}">Bağlı tarayıcılar</h2>
+    {% if tarayicilar is none %}
+      <p class="text-sm text-metin-3">Doğrudan tarama bu bilgisayarda kapalı.</p>
+    {% elif tarayicilar %}
+      <ul class="space-y-2">
+        {% for t in tarayicilar %}
+          <li class="flex items-center gap-2 text-sm text-metin">
+            <span class="h-2.5 w-2.5 shrink-0 rounded-full bg-emerald-500" aria-hidden="true"></span>{{ t.ad }}
+          </li>
+        {% endfor %}
+      </ul>
+    {% else %}
+      <p class="text-sm text-metin-2">Şu an bağlı tarayıcı yok.</p>
+    {% endif %}
+  </section>
+
+  <section class="{{ kart }}" style="--i: 3" data-durum-klasorler>
+    <h2 class="{{ baslik }}">İzlenen klasörler</h2>
+    {% if klasorler %}
+      <ul class="space-y-3">
+        {% for k in klasorler %}
+          <li class="text-sm">
+            <span class="flex items-center gap-2 font-medium text-metin">
+              <span class="h-2.5 w-2.5 shrink-0 rounded-full {{ 'bg-emerald-500' if k.izleniyor else 'bg-slate-300 dark:bg-slate-600' }}" aria-hidden="true"></span>
+              <span class="min-w-0 break-all">{{ k.yol }}</span>
+            </span>
+            <span class="ml-[18px] block text-xs text-metin-3">
+              {{ k.tur }} · {{ 'İzleniyor' if k.izleniyor else 'İzlenmiyor' }}{% if k.not %} · {{ k.not }}{% endif %}
+            </span>
+          </li>
+        {% endfor %}
+      </ul>
+    {% else %}
+      <p class="text-sm text-metin-2">İzlenen klasör yok.</p>
+    {% endif %}
+    <a href="{{ url_for('klasorler') }}" class="mt-4 inline-block text-sm font-semibold text-marka-600 hover:underline dark:text-marka-400">Klasör ekle ya da kaldır</a>
+  </section>
+
+  <section class="{{ kart }}" style="--i: 4" data-durum-aktarilanlar>
+    <h2 class="{{ baslik }}">Son aktarılan dosyalar</h2>
+    {% if aktarilanlar %}
+      <ul class="divide-y divide-cizgi">
+        {% for a in aktarilanlar %}
+          <li class="py-2 text-sm">
+            <span class="block truncate font-medium text-metin">{{ a.dosya }}</span>
+            <span class="block text-xs text-metin-3">
+              <time data-zaman datetime="{{ a.zaman.isoformat() }}">{{ a.zaman.strftime('%d.%m.%Y %H:%M') }}</time>
+              · {{ 'Gelen belgeler' if a.gelen_kutusu else a.kime }} · {{ a.kaynak }}
+            </span>
+          </li>
+        {% endfor %}
+      </ul>
+    {% else %}
+      <p class="text-sm text-metin-2">Uygulama açıldığından beri aktarılan dosya yok.</p>
+    {% endif %}
+  </section>
+
+  <section class="{{ kart }}" style="--i: 5" data-durum-hatalar>
+    <h2 class="{{ baslik }}">Son hatalar</h2>
+    {% if hatalar %}
+      <ul class="divide-y divide-cizgi">
+        {% for h in hatalar %}
+          <li class="py-2 text-sm">
+            <span class="block text-metin">{{ h.mesaj }}</span>
+            <span class="block text-xs text-metin-3">
+              <time data-zaman datetime="{{ h.zaman.isoformat() }}">{{ h.zaman.strftime('%d.%m.%Y %H:%M') }}</time> · {{ h.kaynak }}
+            </span>
+          </li>
+        {% endfor %}
+      </ul>
+    {% else %}
+      <p class="text-sm text-metin-2">Uygulama açıldığından beri hata olmadı.</p>
+    {% endif %}
+  </section>
+</div>
+{% endblock %}

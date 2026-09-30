@@ -7,10 +7,7 @@
 {% set kota_doldu = belge_sayisi >= belge_limiti %}
 {% set kota_az = not kota_doldu and doluluk >= 80 %}
 
-<header class="kart-giris mb-6 sm:mb-8" style="--i: 0">
-  <h1 class="text-2xl font-extrabold tracking-tight text-metin sm:text-[28px]">Hesabım</h1>
-  <p class="mt-1 text-sm text-metin-2">Hesap bilgileriniz, depolama kotanız ve güvenlik ayarları.</p>
-</header>
+{{ ui.sayfa_basligi([('Hesabım', none)], 'Hesabım', 'Hesap bilgileriniz, depolama kotanız ve güvenlik ayarları.') }}
 
 <div class="grid grid-cols-1 gap-6 lg:grid-cols-3">
 
@@ -18,7 +15,7 @@
   <div class="space-y-4">
     <section class="kart-giris rounded-2xl border border-cizgi bg-kart p-5 shadow-kart sm:p-6" style="--i: 1" aria-label="Profil">
       <div class="flex items-center gap-4">
-        <span class="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-marka-600 to-violet-600 text-xl font-bold uppercase text-white shadow-md shadow-violet-600/25"
+        <span class="flex h-14 w-14 shrink-0 items-center justify-center rounded-lg bg-marka-600/10 text-lg font-semibold uppercase text-marka-700 dark:bg-marka-400/15 dark:text-marka-200"
               aria-hidden="true">{{ current_user.kullanici_adi[:1] }}</span>
         <div class="min-w-0">
           <p class="truncate text-lg font-bold tracking-tight text-metin">{{ current_user.kullanici_adi }}</p>
@@ -30,11 +27,11 @@
     <section class="renkli-kart ton-buz kart-giris rounded-2xl border p-5 shadow-kart sm:p-6" style="--i: 2" aria-labelledby="kota-baslik">
       <div class="mb-3 flex items-start justify-between">
         <h2 id="kota-baslik" class="text-sm font-semibold text-metin-2">Belge kotası</h2>
-        <span class="renkli-ikon ton-buz flex h-10 w-10 items-center justify-center rounded-xl">
+        <span class="flex h-8 w-8 border border-cizgi bg-yuzey/60 text-metin-2 items-center justify-center rounded-xl">
           {{ ui.ikon('veritabani') }}
         </span>
       </div>
-      <p class="text-3xl font-extrabold tracking-tight text-metin">
+      <p class="text-3xl font-semibold tracking-tight text-metin">
         <span class="sayi-gecis" data-sayac="{{ belge_sayisi }}">{{ belge_sayisi }}</span>
         <span class="text-lg font-bold text-metin-3">/ {{ belge_limiti }} belge</span>
       </p>
@@ -61,7 +58,7 @@
        JS yokken form her basista birkac belge isler. #}
     <section id="bilgi-cikar" class="kart-giris scroll-mt-24 rounded-2xl border border-cizgi bg-kart p-5 shadow-kart sm:p-6" style="--i: 3" aria-labelledby="bilgi-cikar-baslik">
       <div class="mb-4 flex items-start gap-3">
-        <span class="renkli-ikon ton-pembe flex h-10 w-10 shrink-0 items-center justify-center rounded-xl">{{ ui.ikon('yildiz') }}</span>
+        <span class="flex h-8 w-8 border border-cizgi bg-yuzey/60 text-metin-2 shrink-0 items-center justify-center rounded-xl">{{ ui.ikon('yildiz') }}</span>
         <div>
           <h2 id="bilgi-cikar-baslik" class="text-base font-bold text-metin">Mevcut belgelerden bilgi çıkar</h2>
           <p class="mt-0.5 text-xs text-metin-3">

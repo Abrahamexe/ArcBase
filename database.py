@@ -1,6 +1,8 @@
-"""PostgreSQL (Neon) baglantisi ve belge kayitlari icin sorgular.
+"""PostgreSQL baglantisi (Neon ya da yerel sunucu) ve belge kayitlari icin sorgular.
 
-Baglanti adresi .env icindeki DATABASE_URL'den okunur. Baglantilar surec
+Baglanti adresi .env icindeki DATABASE_URL'den okunur ve psycopg2'ye oldugu
+gibi verilir: SSL zorunlu tutulmaz, yalnizca adreste (?sslmode=require, Neon)
+belirtilirse uygulanir; yerel PostgreSQL SSL'siz calisir. Baglantilar surec
 basina bir havuzda tutulur ve istekler arasinda yeniden kullanilir: Neon'a
 yeni baglanti (TLS + kimlik dogrulama) bir sorgudan kat kat pahalidir. Bir
 sure bosta kalan baglanti kullanilmadan once yoklanir; Neon uykuya gecip
@@ -54,7 +56,7 @@ def _baglanti_adresi():
     adres = os.getenv("DATABASE_URL")
     if not adres:
         raise VeritabaniHatasi(
-            "DATABASE_URL tanımlı değil. Neon bağlantı adresini .env dosyasına ekleyin."
+            "DATABASE_URL tanımlı değil. Veritabanı bağlantı adresini .env dosyasına ekleyin."
         )
     return adres
 
@@ -185,9 +187,14 @@ def veritabanini_hazirla():
     gidis-donus (~yuzlerce ms) demektir. Cok komutlu sorgu tek islemde calisir;
     bastaki kilit ayni anda acilan sureclerin (gunicorn worker, paralel testler)
     ALTER TABLE'larinin birbirini kilitlemesini (deadlock) onler."""
+    _sorgula(sema_sql())
+
+
+def sema_sql():
+    """Semayi olusturan/genisleten SQL (veri tasima betigi de hedefte kullanir)."""
     ekle = ", ".join(f"ADD COLUMN IF NOT EXISTS {sutun}" for sutun in _EKLENEN_SUTUNLAR)
-    _sorgula(
-        f"""
+    kullanici_ekle = ", ".join(f"ADD COLUMN IF NOT EXISTS {sutun}" for sutun in _KULLANICI_SUTUNLARI)
+    return f"""
         SELECT pg_advisory_xact_lock(4172026);
         CREATE TABLE IF NOT EXISTS kullanicilar (
             id               SERIAL PRIMARY KEY,
@@ -199,6 +206,7 @@ def veritabanini_hazirla():
         -- kucuk harfe cevrilmis ad uzerinden de saglanir.
         CREATE UNIQUE INDEX IF NOT EXISTS idx_kullanicilar_ad_kucuk
             ON kullanicilar (LOWER(kullanici_adi));
+        ALTER TABLE kullanicilar {kullanici_ekle};
         CREATE TABLE IF NOT EXISTS belgeler (
             id               SERIAL PRIMARY KEY,
             kullanici_id     INTEGER NOT NULL
@@ -223,7 +231,6 @@ def veritabanini_hazirla():
         CREATE INDEX IF NOT EXISTS idx_belgeler_isleme ON belgeler(id)
             WHERE isleme_durumu IN ('{BEKLIYOR}', '{ISLENIYOR}');
         """
-    )
 
 
 _EKLENEN_SUTUNLAR = (
@@ -249,6 +256,17 @@ _EKLENEN_SUTUNLAR = (
     "isleme_bilgi JSONB",
     # Gorsel/onizleme her degistiginde artar; gorsel onbellegi ve ETag bununla gecersizlesir.
     "icerik_surumu INTEGER NOT NULL DEFAULT 0",
+    # v6 (kurum): sahipsiz gelen belge (tarama klasoru) yoneticinin "Gelen
+    # belgeler" kutusunda durur; sahibi yoneticidir ama arsivinde (listeler,
+    # sayaclar, kota) gorunmez. Ataninca bayrak kalkar.
+    "gelen_kutusu BOOLEAN NOT NULL DEFAULT FALSE",
+    # Atama kaydi: [{"islem", "yapan_id", "yapan", "kime_id", "kime", "zaman"}]
+    "atama_gecmisi JSONB",
+)
+
+_KULLANICI_SUTUNLARI = (
+    # v6 (kurum): ilk kullanici ya da YONETICI_KULLANICI; "Gelen belgeler"i yonetir.
+    "yonetici BOOLEAN NOT NULL DEFAULT FALSE",
 )
 
 
@@ -271,7 +289,7 @@ def kullanici_ekle(kullanici_adi, sifre_hash):
 def kullanici_getir(kullanici_id):
     """Kullaniciyi id ile getirir, yoksa None dondurur."""
     return _sorgula(
-        "SELECT id, kullanici_adi, sifre_hash, olusturma_tarihi "
+        "SELECT id, kullanici_adi, sifre_hash, olusturma_tarihi, yonetici "
         "FROM kullanicilar WHERE id = %s",
         (kullanici_id,),
         tek=True,
@@ -283,7 +301,7 @@ TSI_FARKI = timedelta(hours=3)  # veritabani saati UTC; hafta Turkiye saatine go
 # Bilgisi cikarilmamis (toplu bilgi cikarmanin isleyecegi) belge kosulu.
 # Arka planda islenmekte olan belgeleri isci zaten isleyecek.
 _BILGISI_EKSIK = (
-    "alanlar IS NULL AND NOT alanlar_elle_duzeltildi "
+    "alanlar IS NULL AND NOT alanlar_elle_duzeltildi AND NOT gelen_kutusu "
     f"AND COALESCE(ocr_metni, '') <> '' AND isleme_durumu = '{TAMAMLANDI}'"
 )
 
@@ -303,14 +321,15 @@ def kullanici_ozeti(kullanici_id):
     satirdaki "sayaclar": sayac_ozeti() bicimi."""
     satir = _sorgula(
         f"""
-        SELECT k.id, k.kullanici_adi, k.sifre_hash, k.olusturma_tarihi,
+        SELECT k.id, k.kullanici_adi, k.sifre_hash, k.olusturma_tarihi, k.yonetici,
           (SELECT COALESCE(json_agg(json_build_object('tur', t.tur, 'adet', t.adet, 'son', t.son)), '[]')
              FROM (SELECT tur, COUNT(*) AS adet, MAX(yuklenme_tarihi) AS son
-                   FROM belgeler WHERE kullanici_id = k.id GROUP BY tur) AS t) AS tur_ozeti,
+                   FROM belgeler WHERE kullanici_id = k.id AND NOT gelen_kutusu GROUP BY tur) AS t) AS tur_ozeti,
           (SELECT json_build_object(
-                    'bu_hafta', COUNT(*) FILTER (WHERE yuklenme_tarihi >= %s),
-                    'isleniyor', COUNT(*) FILTER (WHERE isleme_durumu IN ('{BEKLIYOR}', '{ISLENIYOR}')),
-                    'bilgisi_eksik', COUNT(*) FILTER (WHERE {_BILGISI_EKSIK}))
+                    'bu_hafta', COUNT(*) FILTER (WHERE NOT gelen_kutusu AND yuklenme_tarihi >= %s),
+                    'isleniyor', COUNT(*) FILTER (WHERE NOT gelen_kutusu AND isleme_durumu IN ('{BEKLIYOR}', '{ISLENIYOR}')),
+                    'bilgisi_eksik', COUNT(*) FILTER (WHERE {_BILGISI_EKSIK}),
+                    'gelen', COUNT(*) FILTER (WHERE gelen_kutusu))
              FROM belgeler WHERE kullanici_id = k.id) AS genel_ozet
         FROM kullanicilar k WHERE k.id = %s
         """,
@@ -326,7 +345,8 @@ def kullanici_ozeti(kullanici_id):
 
 def sayac_ozeti(tur_satirlari, genel=None):
     """{"turler": {kod: {adet, son_tarih}}, "toplam", "bu_hafta", "isleniyor",
-    "bilgisi_eksik"}. Hic belgesi olmayan turler de sifirla yer alir; tanimsiz
+    "bilgisi_eksik", "gelen"}. "gelen": Gelen belgeler kutusundaki (arsive
+    sayilmayan) belge sayisi. Hic belgesi olmayan turler de sifirla yer alir; tanimsiz
     tur "diger"e sayilir."""
     turler = {kod: {"adet": 0, "son_tarih": None} for kod in TURLER}
     for satir in tur_satirlari or []:
@@ -345,13 +365,14 @@ def sayac_ozeti(tur_satirlari, genel=None):
         "bu_hafta": genel.get("bu_hafta", 0),
         "isleniyor": genel.get("isleniyor", 0),
         "bilgisi_eksik": genel.get("bilgisi_eksik", 0),
+        "gelen": genel.get("gelen", 0),
     }
 
 
 def kullanici_adi_ile_getir(kullanici_adi):
     """Kullaniciyi adiyla (buyuk/kucuk harf duyarsiz) getirir."""
     return _sorgula(
-        "SELECT id, kullanici_adi, sifre_hash, olusturma_tarihi "
+        "SELECT id, kullanici_adi, sifre_hash, olusturma_tarihi, yonetici "
         "FROM kullanicilar WHERE LOWER(kullanici_adi) = LOWER(%s)",
         (kullanici_adi,),
         tek=True,
@@ -370,10 +391,89 @@ def kullanici_sil(kullanici_id):
     _sorgula("DELETE FROM kullanicilar WHERE id = %s", (kullanici_id,))
 
 
+# ---------------------------------------------------------------- yonetici
+
+def yoneticiyi_belirle(ayar_adi=None):
+    """Yonetici: ayar_adi (YONETICI_KULLANICI) verilmis ve bu adda kullanici
+    varsa yalnizca o; yoksa (hic yonetici kalmadiysa) ilk olusturulan kullanici.
+    Acilista ve her kayittan sonra cagrilir; komutlar tek gidis-donustur."""
+    _sorgula(
+        """
+        UPDATE kullanicilar SET yonetici = (LOWER(kullanici_adi) = LOWER(%(ad)s))
+        WHERE EXISTS (SELECT 1 FROM kullanicilar WHERE LOWER(kullanici_adi) = LOWER(%(ad)s))
+          AND yonetici IS DISTINCT FROM (LOWER(kullanici_adi) = LOWER(%(ad)s));
+        UPDATE kullanicilar SET yonetici = TRUE
+        WHERE id = (SELECT MIN(id) FROM kullanicilar)
+          AND NOT EXISTS (SELECT 1 FROM kullanicilar WHERE yonetici);
+        -- Yonetici degistiyse eskisinin Gelen belgeler kutusu yenisine gecer.
+        UPDATE belgeler SET kullanici_id = (SELECT MIN(id) FROM kullanicilar WHERE yonetici)
+        WHERE gelen_kutusu AND EXISTS (SELECT 1 FROM kullanicilar WHERE yonetici)
+          AND kullanici_id NOT IN (SELECT id FROM kullanicilar WHERE yonetici);
+        """,
+        {"ad": (ayar_adi or "").strip()},
+    )
+
+
+def yonetici_getir():
+    """Gelen belgelerin sahibi olacak yonetici (birden fazlaysa ilk olusturulan)."""
+    return _sorgula(
+        "SELECT id, kullanici_adi FROM kullanicilar WHERE yonetici ORDER BY id LIMIT 1", tek=True
+    )
+
+
+def kullanicilari_listele():
+    """Atama listesi icin kullanici adlari (belge bilgisi icermez)."""
+    return _sorgula("SELECT id, kullanici_adi FROM kullanicilar ORDER BY LOWER(kullanici_adi)", hepsi=True)
+
+
+def gelen_ata(yonetici_id, yonetici_adi, belge_id, hedef_id, hedef_adi, limit):
+    """Gelen belgeler kutusundaki belgeyi hedef kullanicinin arsivine tasir ve
+    atamayi belgenin atama_gecmisi'ne yazar (kim, kime, ne zaman).
+
+    Donus: "tamam" | "yok" (belge yoneticinin gelen kutusunda degil) | "kota"
+    (hedefin arsivi dolu). Kota denetimi ve atama tek sorguda yapilir."""
+    kayit = {
+        "islem": "atama",
+        "yapan_id": yonetici_id,
+        "yapan": yonetici_adi,
+        "kime_id": hedef_id,
+        "kime": hedef_adi,
+        "zaman": datetime.now(timezone.utc).replace(tzinfo=None).isoformat(timespec="seconds"),
+    }
+    satir = _sorgula(
+        """
+        WITH kota AS (
+            SELECT COUNT(*) AS adet FROM belgeler WHERE kullanici_id = %(hedef)s AND NOT gelen_kutusu
+        )
+        UPDATE belgeler SET kullanici_id = %(hedef)s, gelen_kutusu = FALSE,
+            atama_gecmisi = COALESCE(atama_gecmisi, '[]'::jsonb) || jsonb_build_array(%(kayit)s::jsonb)
+        WHERE id = %(belge)s AND kullanici_id = %(yonetici)s AND gelen_kutusu
+          AND (SELECT adet FROM kota) < %(limit)s
+        RETURNING id
+        """,
+        {"hedef": hedef_id, "kayit": psycopg2.extras.Json(kayit), "belge": belge_id,
+         "yonetici": yonetici_id, "limit": limit},
+        tek=True,
+    )
+    if satir is not None:
+        return "tamam"
+    var = _sorgula(
+        "SELECT 1 FROM belgeler WHERE id = %s AND kullanici_id = %s AND gelen_kutusu",
+        (belge_id, yonetici_id),
+        tek=True,
+    )
+    return "kota" if var else "yok"
+
+
 # ---------------------------------------------------------------- belgeler
 # VERI AYRIMI: Asagidaki her sorgu kullanici_id alir ve WHERE kullanici_id = %s
 # icerir. Baska kullanicinin belgesi id ile istense bile bulunamaz (None / 0
 # satir); route'lar bunu 404'e cevirir. Bu kuralin istisnasi yoktur.
+#
+# Gelen belgeler kutusu (gelen_kutusu = TRUE) yoneticiye aittir; yonetici bu
+# belgeleri id ile acabilir (goruntu, tur, silme) ama arsiv listeleri, sayaclar
+# ve kota onlari icermez. Yonetici baska kullanicilarin belgelerini goremez;
+# atama belgenin sahibini degistirir (gelen_ata).
 
 def belge_ekle(
     kullanici_id,
@@ -391,12 +491,14 @@ def belge_ekle(
     orijinal_saklandi=False,
     isleme_durumu=TAMAMLANDI,
     isleme_bilgi=None,
+    gelen_kutusu=False,
 ):
     """Yeni belgeyi kaydeder ve eklenen kaydin id'sini dondurur.
 
     alanlar: alanlar.dogrula() ciktisi; None ise bilgi cikarilamamis demektir.
     isleme_durumu=BEKLIYOR: yuklenen ham dosya; OCR ve siniflandirmayi
     arka plan iscisi yapar (isleme.py).
+    gelen_kutusu=True: sahipsiz gelen belge; kullanici_id yoneticidir.
     """
     bilgi = _bilgi_sutunlari(alanlar)
     satir = _sorgula(
@@ -405,8 +507,8 @@ def belge_ekle(
             (kullanici_id, dosya_adi, mime_type, sifreli_icerik,
              sifreli_onizleme, ocr_metni, tur, guven, aciklama,
              belge_tarihi, tutar, para_birimi, kurum, alanlar, otomatik_duzeltildi,
-             koseler, orijinal_saklandi, isleme_durumu, isleme_bilgi)
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+             koseler, orijinal_saklandi, isleme_durumu, isleme_bilgi, gelen_kutusu)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
         RETURNING id
         """,
         (
@@ -425,6 +527,7 @@ def belge_ekle(
             orijinal_saklandi,
             isleme_durumu,
             _json(isleme_bilgi),
+            gelen_kutusu,
         ),
         tek=True,
     )
@@ -461,14 +564,14 @@ _OZET_SUTUNLAR = (
     "id, dosya_adi, mime_type, tur, guven, aciklama, "
     "elle_duzeltildi, yuklenme_tarihi, (sifreli_onizleme IS NOT NULL) AS onizleme_var, "
     "belge_tarihi, tutar, para_birimi, kurum, alanlar_elle_duzeltildi, otomatik_duzeltildi, "
-    "orijinal_saklandi, isleme_durumu, isleme_bilgi, icerik_surumu"
+    "orijinal_saklandi, isleme_durumu, isleme_bilgi, icerik_surumu, gelen_kutusu"
 )
 
 
 def belge_getir(kullanici_id, belge_id):
     """Kullanicinin tek bir belgesini (icerik haric) getirir, yoksa None dondurur."""
     return _sorgula(
-        f"SELECT {_OZET_SUTUNLAR}, alanlar, koseler, ocr_metni FROM belgeler "
+        f"SELECT {_OZET_SUTUNLAR}, alanlar, koseler, ocr_metni, atama_gecmisi FROM belgeler "
         "WHERE id = %s AND kullanici_id = %s",
         (belge_id, kullanici_id),
         tek=True,
@@ -497,7 +600,7 @@ def belge_icerigi(kullanici_id, belge_id, onizleme=False, bilinen_surumler=()):
 def belgeleri_listele(kullanici_id, limit=50):
     """Kullanicinin belgelerini en yeniden eskiye dogru listeler."""
     return _sorgula(
-        f"SELECT {_OZET_SUTUNLAR} FROM belgeler WHERE kullanici_id = %s "
+        f"SELECT {_OZET_SUTUNLAR} FROM belgeler WHERE kullanici_id = %s AND NOT gelen_kutusu "
         "ORDER BY id DESC LIMIT %s",
         (kullanici_id, limit),
         hepsi=True,
@@ -523,14 +626,16 @@ def belgeleri_suz(
     maks_tutar=None,
     siralama="yukleme",
     limit=None,
+    gelen=False,
 ):
     """Kategori, arama ve Excel disa aktarmanin ortak sorgusu.
 
     sorgu: dosya adi, OCR metni, kurum ve alanlar (JSONB degerleri) icinde
     buyuk/kucuk harf duyarsiz arar. Tarih suzgeci belge_tarihi'ne uygulanir;
     tarihi olmayan belgeler tarih suzgeci verilince listelenmez.
+    gelen=True: arsiv yerine kullanicinin Gelen belgeler kutusu.
     """
-    kosullar, parametreler = ["kullanici_id = %s"], [kullanici_id]
+    kosullar, parametreler = ["kullanici_id = %s", "gelen_kutusu = %s"], [kullanici_id, gelen]
 
     def ekle(kosul, *degerler):
         kosullar.append(kosul)
@@ -569,7 +674,7 @@ def belgeleri_suz(
 def belge_sayisi(kullanici_id):
     """Kullanicinin toplam belge sayisi (kota kontrolu icin)."""
     satir = _sorgula(
-        "SELECT COUNT(*) AS adet FROM belgeler WHERE kullanici_id = %s",
+        "SELECT COUNT(*) AS adet FROM belgeler WHERE kullanici_id = %s AND NOT gelen_kutusu",
         (kullanici_id,),
         tek=True,
     )
@@ -584,7 +689,7 @@ def tur_sayilari(kullanici_id):
     """
     satirlar = _sorgula(
         "SELECT tur, COUNT(*) AS adet, MAX(yuklenme_tarihi) AS son_tarih "
-        "FROM belgeler WHERE kullanici_id = %s GROUP BY tur",
+        "FROM belgeler WHERE kullanici_id = %s AND NOT gelen_kutusu GROUP BY tur",
         (kullanici_id,),
         hepsi=True,
     )

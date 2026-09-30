@@ -12,19 +12,17 @@
 {% set sayfa = [[(request.args.get('sayfa') or 1) | int, 1] | max, toplam_sayfa] | min %}
 {% set bas = (sayfa - 1) * sayfa_boyu %}
 
-<header class="kart-giris mb-6" style="--i: 0">
-  <h1 class="text-2xl font-extrabold tracking-tight text-metin sm:text-[28px]">Arama</h1>
-  <p class="mt-1 text-sm text-metin-2">Dosya adlarında, belgelerin içindeki yazılarda ve bilgilerinde (kurum, konu, fatura no…) arayın.</p>
-</header>
+{{ ui.sayfa_basligi([('Ana işler', none), ('Arama', none)], 'Arama',
+                   'Dosya adlarında, belgelerin içindeki yazılarda ve bilgilerinde (kurum, konu, fatura no…) arayın.') }}
 
 <form action="{{ url_for('ara') }}" method="get" role="search" class="kart-giris relative mb-6" style="--i: 1">
   <label for="sayfa-arama" class="sr-only">Arama terimi</label>
   <span class="pointer-events-none absolute inset-y-0 left-4 flex items-center text-metin-3">{{ ui.ikon('ara', 'w-5 h-5') }}</span>
   <input type="search" id="sayfa-arama" name="q" value="{{ sorgu }}" {% if not sorgu %}autofocus{% endif %}
          placeholder="Örn. fatura numarası, kurum adı, kişi adı…" autocomplete="off"
-         class="h-14 w-full rounded-2xl border border-cizgi bg-kart pl-12 pr-32 text-base text-metin shadow-kart
-                placeholder:text-metin-3 transition focus:border-marka-500 focus:outline-none focus:ring-4 focus:ring-marka-500/15">
-  <button type="submit" class="btn btn-birincil absolute right-2 top-2 h-10">Ara</button>
+         class="h-12 w-full rounded-lg border border-cizgi bg-kart pl-12 pr-28 text-base text-metin shadow-kart
+                placeholder:text-metin-3 transition focus:border-marka-500 focus:outline-none focus:ring-2 focus:ring-marka-500/20">
+  <button type="submit" class="btn btn-birincil absolute right-1.5 top-1.5 h-9">Ara</button>
 </form>
 
 {% if sorgu %}

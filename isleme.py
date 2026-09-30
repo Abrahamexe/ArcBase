@@ -77,6 +77,38 @@ def saklanacak_hal(veri, mime_type, dosya_adi):
     return veri, mime_type, dosya_adi, ocr.onizleme_uret(veri, mime_type), False
 
 
+def kuyruga_ekle(kullanici_id, veri, mime_type, dosya_adi, duzelt=True, gelen_kutusu=False, kaynak=None):
+    """Dogrulanmis dosyayi "bekliyor" olarak kaydeder ve isciyi uyandirir;
+    belge_id dondurur. Tarayicidan yukleme (app.py) ve tarama klasoru
+    (klasor_izleme.py) ayni yolu kullanir.
+
+    Gorsel hemen en fazla 2000 px JPEG'e kucultulup saklanir; islenene kadar
+    listede kirpilmamis onizleme gorunur. Tam cozunurluklu dosya OCR icin
+    isciye bellekte birakilir. kaynak: "klasor" gibi (isleme_bilgi'ye yazilir)."""
+    icerik, mime_type, dosya_adi, onizleme, orijinal = saklanacak_hal(veri, mime_type, dosya_adi)
+    bilgi = {"asama": "goruntu", "duzelt": duzelt}
+    if kaynak:
+        bilgi["kaynak"] = kaynak
+    belge_id = database.belge_ekle(
+        kullanici_id=kullanici_id,
+        dosya_adi=dosya_adi,
+        mime_type=mime_type,
+        sifreli_icerik=crypto.sifrele(icerik),
+        sifreli_onizleme=crypto.sifrele(onizleme) if onizleme else None,
+        ocr_metni=None,
+        tur=VARSAYILAN_TUR,
+        guven=None,
+        aciklama=None,
+        orijinal_saklandi=orijinal,
+        isleme_durumu=database.BEKLIYOR,
+        isleme_bilgi=bilgi,
+        gelen_kutusu=gelen_kutusu,
+    )
+    ham_birak(belge_id, veri)
+    uyandir()
+    return belge_id
+
+
 def ham_birak(belge_id, veri):
     """Tam cozunurluklu dosyayi isciye bellekte birakir (ayni surecte islenirse
     OCR bundan yapilir)."""

@@ -24,6 +24,25 @@ tests/ozel/
 .vscode/
 .idea/
 
+# Arayuz efektleri vitrini (yerel denemeler)
+docs/vitrin/
+
 # Proje planlari (yerel calisma notlari)
 plan*.md
 DEVAM.md
+
+# Veritabani yedekleri (scripts/yedekle.py varsayilan klasoru)
+yedekler/
+*.dump
+
+# Gercek belgeler: izlenen tarama klasoru ve taranmis PDF/TIFF dosyalari
+Tarama/
+*.pdf
+*.tif
+*.tiff
+
+# Uygulama gunlukleri (baslat.bat /otomatik)
+logs/
+
+# Bu bilgisayarda eklenen/kaldirilan izlenen klasorler (izlenen_klasorler.py)
+veri/

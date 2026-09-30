@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% import "_bilesenler.html" as ui with context %}
+{% block baslik %}Gelen belgeler — ArcBase{% endblock %}
+
+{% block icerik %}
+{# Yoneticinin kutusu: tarama klasorunun kokune dusen (sahibi belli olmayan)
+   belgeler. Yalnizca bu belgeler listelenir; kullanicilarin arsivleri degil. #}
+{{ ui.sayfa_basligi([('Arşiv', none), ('Gelen belgeler', none)], 'Gelen belgeler',
+                   'Tarayıcıdan gelen ve sahibi belli olmayan belgeler. Her belgeyi ilgili kullanıcıya atayın ya da kendi arşivinize alın; atama kaydedilir.') }}
+
+{% if belgeler %}
+  <section aria-label="Gelen belgeler" class="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3" data-gelen-listesi>
+    {% for b in belgeler %}
+      <div class="flex flex-col gap-2" data-gelen-belge="{{ b.id }}">
+        {{ ui.belge_karti(b, loop.index0 + 2) }}
+        {{ ui.atama_formu(b.id, kullanicilar) }}
+      </div>
+    {% endfor %}
+  </section>
+{% else %}
+  {{ ui.bos_durum('gelen', 'Gelen belge yok',
+                  'Tarama klasörüne sahipsiz düşen belgeler burada görünür.', ton='ton-nane') }}
+{% endif %}
+{% endblock %}

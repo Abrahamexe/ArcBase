@@ -29,6 +29,8 @@
   const bekle = (ms) => new Promise((coz) => setTimeout(coz, ms));
   // base.html bu betige isleme durumu adresini verir (yukleme sonrasi yoklama).
   const DURUM_ADRESI = document.currentScript?.dataset.durumAdresi || '/isleme-durumu';
+  // Dogrudan tarama acikken (Windows) bagli tarayicilarin durum adresi; kapaliyken yok.
+  const TARAYICI_ADRESI = document.currentScript?.dataset.tarayiciAdresi;
 
   // fetch cevabini JSON olarak okur. Oturum dustuyse sunucu giris sayfasina
   // yonlendirir ve HTML doner; bu durum anlasilir bir hataya cevrilir.
@@ -74,6 +76,57 @@
   });
 
   /* ---------------------------------------------------------------- kenar menu */
+  const kenarNav = $('#kenar-menu nav');
+  const gosterge = $('[data-aktif-gosterge]');
+
+  // Kayan aktif gosterge: aktif sayfanin ogesinin arkasinda durur. Sayfa
+  // degisince onceki sayfadaki konumundan yenisine kayar (konum sessionStorage'da).
+  function gostergeKonumu() {
+    const aktif = kenarNav && $('.menu-ogesi[aria-current="page"]', kenarNav);
+    if (!aktif || !aktif.offsetParent || aktif.closest('.grup-icerik[data-kapali]')) return null;
+    const n = kenarNav.getBoundingClientRect();
+    const a = aktif.getBoundingClientRect();
+    return { ust: a.top - n.top + kenarNav.scrollTop, yukseklik: a.height };
+  }
+  function gostergeyiKonumla(anlik) {
+    if (!gosterge) return;
+    const konum = gostergeKonumu();
+    gosterge.classList.toggle('anlik', !!anlik);
+    gosterge.classList.toggle('gorunur', !!konum);
+    if (!konum) return;
+    gosterge.style.height = konum.yukseklik + 'px';
+    gosterge.style.transform = 'translateY(' + konum.ust + 'px)';
+  }
+  // Grup acilip kapanirken ya da menu daralirken gosterge her karede izler.
+  function gostergeyiIzle(ms = 400) {
+    const bitis = performance.now() + ms;
+    (function kare() {
+      gostergeyiKonumla(true);
+      if (performance.now() < bitis) requestAnimationFrame(kare);
+    })();
+  }
+  if (gosterge) {
+    let onceki = null;
+    try { onceki = JSON.parse(sessionStorage.getItem('menuGostergesi') || 'null'); } catch (e) { /* yok */ }
+    sessionStorage.removeItem('menuGostergesi');
+    const simdi = gostergeKonumu();
+    if (onceki && simdi && !azHareket && Math.abs(onceki.ust - simdi.ust) > 1) {
+      gosterge.classList.add('anlik', 'gorunur');
+      gosterge.style.height = onceki.yukseklik + 'px';
+      gosterge.style.transform = 'translateY(' + onceki.ust + 'px)';
+      gosterge.getBoundingClientRect(); // baslangic konumu cizilsin
+      requestAnimationFrame(() => requestAnimationFrame(() => gostergeyiKonumla(false)));
+    } else {
+      gostergeyiKonumla(true);
+    }
+    $$('a.menu-ogesi', kenarNav).forEach((a) => a.addEventListener('click', () => {
+      const konum = gostergeKonumu();
+      try { if (konum) sessionStorage.setItem('menuGostergesi', JSON.stringify(konum)); } catch (e) { /* gizli mod */ }
+    }));
+    window.addEventListener('resize', () => gostergeyiKonumla(true), { passive: true });
+    document.fonts?.ready.then(() => gostergeyiKonumla(true));
+  }
+
   const daraltDugmesi = $('[data-kenar-daralt]');
   function daraltEtiketiniGuncelle() {
     if (!daraltDugmesi) return;
@@ -81,26 +134,86 @@
     daraltDugmesi.setAttribute('aria-label', dar ? 'Menüyü genişlet' : 'Menüyü daralt');
     daraltDugmesi.setAttribute('aria-expanded', String(!dar));
   }
-  daraltEtiketiniGuncelle();
-  daraltDugmesi?.addEventListener('click', () => {
-    const dar = kok.classList.toggle('kenar-dar');
+  function menuyuDaralt(dar) {
+    kok.classList.toggle('kenar-dar', dar);
     kaydet('kenar', dar ? 'dar' : 'genis');
     ipucuGizle();
     daraltEtiketiniGuncelle();
-  });
+    gostergeyiIzle(400);
+  }
+  daraltEtiketiniGuncelle();
+  daraltDugmesi?.addEventListener('click', () => menuyuDaralt(!kok.classList.contains('kenar-dar')));
 
   const menuAcDugmesi = $('[data-menu-ac]');
   function mobilMenu(acik) {
     kok.classList.toggle('menu-acik', acik);
     menuAcDugmesi?.setAttribute('aria-expanded', String(acik));
-    if (acik) $('#kenar-menu a[aria-current], #kenar-menu a')?.focus({ preventScroll: true });
+    if (acik) {
+      $('#kenar-menu a[aria-current], #kenar-menu a')?.focus({ preventScroll: true });
+      gostergeyiIzle(400);
+    }
   }
   menuAcDugmesi?.addEventListener('click', () => mobilMenu(true));
   $$('[data-menu-kapat]').forEach((el) => el.addEventListener('click', () => mobilMenu(false)));
   $$('#kenar-menu a').forEach((a) => a.addEventListener('click', () => mobilMenu(false)));
 
-  // Daraltilmis menude oge adlari ipucu olarak gosterilir. Menu kaydirilabilir
-  // oldugu icin ipucu menunun icinde degil, sabit konumlu ayri bir katmanda cizilir.
+  // Menu gruplari (Ana isler, Arsiv, Yonetim) ve Kategoriler alt listesi
+  // yuksekligi animasyonla acilir-kapanir; durum tarayicida hatirlanir. Ilk durum
+  // base.html'deki satir ici betikle boyamadan once uygulanir.
+  $$('[data-grup-dugmesi]').forEach((dugme) => {
+    dugme.addEventListener('click', () => {
+      // Dar menude "Kategoriler"e basmak menuyu genisletip listeyi acar.
+      if (kok.classList.contains('kenar-dar') && window.innerWidth >= 1024) {
+        if (!('altListe' in dugme.dataset)) return;
+        menuyuDaralt(false);
+        dugme.setAttribute('aria-expanded', 'true');
+      } else {
+        dugme.setAttribute('aria-expanded', String(dugme.getAttribute('aria-expanded') !== 'true'));
+      }
+      const acik = dugme.getAttribute('aria-expanded') === 'true';
+      document.getElementById(dugme.getAttribute('aria-controls')).toggleAttribute('data-kapali', !acik);
+      gostergeyiIzle(400);
+      let durum = {};
+      try { durum = JSON.parse(localStorage.getItem('menuGruplari') || '{}'); } catch (e) { /* bozuk kayit */ }
+      durum[dugme.dataset.grupDugmesi] = acik;
+      kaydet('menuGruplari', JSON.stringify(durum));
+    });
+  });
+
+  // Kullanici karti: Hesabim, tema ve Cikis iceren menu; yukari dogru olcek ve
+  // opaklikla acilir, kapanis animasyonu bitince gizlenir.
+  const kullaniciKarti = $('[data-kullanici-karti]');
+  const kullaniciMenusu = $('[data-kullanici-menusu]');
+  let kullaniciMenusuZamani = null;
+  const kullaniciMenusuAcik = () => kullaniciMenusu && kullaniciMenusu.classList.contains('acik');
+  function kullaniciMenusuAc(acik) {
+    if (!kullaniciMenusu) return;
+    clearTimeout(kullaniciMenusuZamani);
+    kullaniciKarti.setAttribute('aria-expanded', String(acik));
+    if (acik) {
+      kullaniciMenusu.hidden = false;
+      kullaniciMenusu.getBoundingClientRect();
+      kullaniciMenusu.classList.add('acik');
+      ipucuGizle();
+      $('a, button', kullaniciMenusu)?.focus({ preventScroll: true });
+    } else {
+      kullaniciMenusu.classList.remove('acik');
+      kullaniciMenusuZamani = setTimeout(() => { kullaniciMenusu.hidden = true; }, azHareket ? 0 : 300);
+    }
+  }
+  kullaniciKarti?.addEventListener('click', () => kullaniciMenusuAc(!kullaniciMenusuAcik()));
+  document.addEventListener('click', (olay) => {
+    if (kullaniciMenusuAcik() && !olay.target.closest('[data-kullanici-alani]')) kullaniciMenusuAc(false);
+  });
+  document.addEventListener('keydown', (olay) => {
+    if (olay.key === 'Escape' && kullaniciMenusuAcik()) {
+      kullaniciMenusuAc(false);
+      kullaniciKarti.focus();
+    }
+  });
+
+  // Daraltilmis menude oge adlari (ve sayilari) ipucu olarak gosterilir. Menu
+  // kaydirilabilir oldugu icin ipucu sabit konumlu ayri bir katmanda cizilir.
   const ipucu = document.createElement('div');
   ipucu.className = 'ipucu';
   ipucu.setAttribute('role', 'tooltip');
@@ -108,9 +221,14 @@
   function ipucuGizle() { ipucu.classList.remove('gorunur'); }
   $$('#kenar-menu [data-ipucu]').forEach((el) => {
     const goster = () => {
-      if (!kok.classList.contains('kenar-dar') || window.innerWidth < 1024) return;
+      if (!kok.classList.contains('kenar-dar') || window.innerWidth < 1024 || kullaniciMenusuAcik()) return;
       const r = el.getBoundingClientRect();
       ipucu.textContent = el.dataset.ipucu;
+      if (el.dataset.ipucuEk) {
+        const ek = document.createElement('b');
+        ek.textContent = el.dataset.ipucuEk;
+        ipucu.append(ek);
+      }
       ipucu.style.top = r.top + r.height / 2 + 'px';
       ipucu.style.left = r.right + 12 + 'px';
       ipucu.classList.add('gorunur');
@@ -120,7 +238,7 @@
     el.addEventListener('mouseleave', ipucuGizle);
     el.addEventListener('blur', ipucuGizle);
   });
-  $('#kenar-menu nav')?.addEventListener('scroll', ipucuGizle, { passive: true });
+  kenarNav?.addEventListener('scroll', ipucuGizle, { passive: true });
 
   /* ---------------------------------------------------------------- pencereler */
   function pencereAc(pencere) {
@@ -159,6 +277,219 @@
     mobilMenu(false);
     pencereAc(yuklemePenceresi);
   }));
+
+  /* ---------------------------------------------------------------- komut paleti (Ctrl+K)
+   Ortada acilan arama/komut penceresi: hizli eylemler, sayfalara gitme ve
+   belge arama. Sayfalar menudeki baglantilardan toplanir (kullanicinin
+   gormedigi sayfa cikmaz). Belgeler mevcut /ara sayfasindan okunur. */
+  const palet = $('#komut-paleti');
+  if (palet) {
+    const girdi = $('#komut-girdi', palet);
+    const liste = $('#komut-listesi', palet);
+    const ikonKopyala = (secici) => $(secici)?.cloneNode(true) || null;
+    const sade = (s) => s.toLocaleLowerCase('tr').replace(/[çğıöşü]/g, (h) => ({ ç: 'c', ğ: 'g', ı: 'i', ö: 'o', ş: 's', ü: 'u' })[h]);
+    let secili = 0;
+    let ogeler = [];
+    let aramaIstegi = null;
+    let aramaZamani = null;
+    let belgeSonuclari = null; // null: aranmadi · 'yukleniyor' · []
+
+    function eylemler() {
+      const e = [];
+      e.push({ grup: 'Hızlı eylemler', ad: 'Yeni belge', alt: 'Fotoğraf veya PDF yükle', ikon: '[data-yukleme-ac] svg', kisayol: '',
+               calistir: () => $('[data-yukleme-ac]')?.click() });
+      const tara = $('[data-tara-menu]:not([hidden]), [data-tara-dugmesi]:not([hidden])');
+      if (tara) e.push({ grup: 'Hızlı eylemler', ad: 'Tara', alt: 'Bağlı tarayıcıdan belge tara', ikon: '[data-tara-menu] svg', href: tara.href });
+      e.push({ grup: 'Hızlı eylemler', ad: kok.classList.contains('dark') ? 'Açık temaya geç' : 'Koyu temaya geç', alt: 'Tema değiştir',
+               ikon: kok.classList.contains('dark') ? '.ikon-ay svg' : '.ikon-gunes svg', calistir: () => $('[data-tema-degistir]')?.click() });
+      if (window.innerWidth >= 1024 && daraltDugmesi) {
+        e.push({ grup: 'Hızlı eylemler', ad: kok.classList.contains('kenar-dar') ? 'Menüyü genişlet' : 'Menüyü daralt', alt: 'Kenar menü',
+                 ikon: '[data-kenar-daralt] svg', calistir: () => daraltDugmesi.click() });
+      }
+      return e;
+    }
+    function sayfalar() {
+      const goruldu = new Set();
+      return $$('#kenar-menu a.menu-ogesi[href]').filter((a) => !a.hidden && !goruldu.has(a.href) && goruldu.add(a.href)).map((a) => {
+        const kategori = a.closest('.alt-liste');
+        const ad = ($('.kenar-etiket', a) || a).textContent.trim();
+        return {
+          grup: 'Sayfalar', ad, alt: kategori ? 'Kategori · ' + ($('.menu-sayac', a)?.textContent.trim() || '0') + ' belge' : '',
+          ikon: a, href: a.href,
+        };
+      });
+    }
+
+    function vurgula(metin, sorgu) {
+      const kap = document.createElement('span');
+      const yer = sorgu ? sade(metin).indexOf(sade(sorgu)) : -1;
+      if (yer < 0 || sade(metin).length !== metin.length) { kap.textContent = metin; return kap; }
+      const isaret = document.createElement('mark');
+      isaret.textContent = metin.slice(yer, yer + sorgu.length);
+      kap.append(metin.slice(0, yer), isaret, metin.slice(yer + sorgu.length));
+      return kap;
+    }
+
+    function ikonuAl(kaynak) {
+      if (!kaynak) return null;
+      if (kaynak instanceof SVGElement) return document.importNode(kaynak, true);
+      if (typeof kaynak !== 'string') return $('.menu-ikon svg, .menu-ikon .kategori-nokta', kaynak)?.cloneNode(true) || null;
+      return ikonKopyala(kaynak);
+    }
+
+    function ciz() {
+      const sorgu = girdi.value.trim();
+      const s = sade(sorgu);
+      const uygun = (o) => !s || sade(o.ad + ' ' + (o.alt || '')).includes(s);
+      ogeler = [...eylemler().filter(uygun), ...sayfalar().filter(uygun)];
+      if (Array.isArray(belgeSonuclari)) ogeler.push(...belgeSonuclari);
+      if (sorgu) {
+        ogeler.push({ grup: 'Belgeler', ad: '“' + sorgu + '” için tüm sonuçlar', alt: 'Arama sayfasında aç',
+                      ikon: '#komut-paleti .komut-girdi-alani svg', href: palet.dataset.aramaAdresi + '?q=' + encodeURIComponent(sorgu) });
+      }
+      secili = Math.min(secili, Math.max(ogeler.length - 1, 0));
+
+      const parca = document.createDocumentFragment();
+      let grup = null;
+      ogeler.forEach((o, i) => {
+        if (o.grup !== grup) {
+          grup = o.grup;
+          const baslik = document.createElement('div');
+          baslik.className = 'komut-baslik';
+          baslik.textContent = grup;
+          parca.append(baslik);
+          if (grup === 'Belgeler' && belgeSonuclari === 'yukleniyor') parca.append(...iskeletler());
+        }
+        const el = document.createElement(o.href ? 'a' : 'button');
+        if (o.href) el.href = o.href; else el.type = 'button';
+        el.className = 'komut-ogesi';
+        el.id = 'komut-' + i;
+        el.setAttribute('role', 'option');
+        el.setAttribute('aria-selected', String(i === secili));
+        el.tabIndex = -1;
+        const ikon = document.createElement('span');
+        ikon.className = 'komut-ikon';
+        const svg = ikonuAl(o.ikon);
+        if (svg) ikon.append(svg);
+        const metin = document.createElement('span');
+        metin.className = 'komut-metin';
+        const b = document.createElement('b');
+        b.append(vurgula(o.ad, sorgu));
+        metin.append(b);
+        if (o.alt) { const k = document.createElement('small'); k.textContent = o.alt; metin.append(k); }
+        const ek = document.createElement('span');
+        ek.className = 'komut-ek';
+        ek.append(ikonKopyala('#komut-enter-ikonu svg') || '↵');
+        el.append(ikon, metin, ek);
+        el.addEventListener('mousemove', () => { if (secili !== i) sec(i, false); });
+        el.addEventListener('click', (olay) => { olay.preventDefault(); calistir(i); });
+        parca.append(el);
+      });
+      if (belgeSonuclari === 'yukleniyor' && !ogeler.some((o) => o.grup === 'Belgeler')) {
+        const baslik = document.createElement('div');
+        baslik.className = 'komut-baslik';
+        baslik.textContent = 'Belgeler';
+        parca.append(baslik, ...iskeletler());
+      }
+      if (!ogeler.length && belgeSonuclari !== 'yukleniyor') {
+        const bos = document.createElement('p');
+        bos.className = 'komut-bos';
+        bos.textContent = 'Sonuç bulunamadı.';
+        parca.append(bos);
+      }
+      liste.replaceChildren(parca);
+      girdi.setAttribute('aria-activedescendant', ogeler.length ? 'komut-' + secili : '');
+    }
+
+    function iskeletler() {
+      return [0, 1, 2].map(() => {
+        const s = document.createElement('div');
+        s.className = 'komut-iskelet';
+        s.innerHTML = '<i></i><span><i></i><i></i></span>';
+        return s;
+      });
+    }
+
+    function sec(i, kaydir = true) {
+      if (!ogeler.length) return;
+      secili = (i + ogeler.length) % ogeler.length;
+      $$('.komut-ogesi', liste).forEach((el, j) => el.setAttribute('aria-selected', String(j === secili)));
+      girdi.setAttribute('aria-activedescendant', 'komut-' + secili);
+      if (kaydir) $('#komut-' + secili, liste)?.scrollIntoView({ block: 'nearest' });
+    }
+
+    function calistir(i) {
+      const o = ogeler[i];
+      if (!o) return;
+      pencereKapat(palet, true);
+      if (o.href) location.href = o.href;
+      else o.calistir?.();
+    }
+
+    // Belge arama: /ara sayfasinin sonuc kartlari okunur (en fazla 6).
+    async function belgeAra(sorgu) {
+      aramaIstegi?.abort();
+      if (sorgu.length < 2) { belgeSonuclari = null; ciz(); return; }
+      belgeSonuclari = 'yukleniyor';
+      ciz();
+      const istek = new AbortController();
+      aramaIstegi = istek;
+      try {
+        const yanit = await fetch(palet.dataset.aramaAdresi + '?q=' + encodeURIComponent(sorgu),
+                                  { credentials: 'same-origin', signal: istek.signal });
+        const belge = new DOMParser().parseFromString(await yanit.text(), 'text/html');
+        belgeSonuclari = $$('.belge-karti', belge).slice(0, 6).map((kart) => {
+          const tur = $('.p-4 > div:last-child > span:first-child', kart);
+          const tarih = $('time', kart);
+          return {
+            grup: 'Belgeler',
+            ad: $('p[title]', kart)?.getAttribute('title') || 'Belge',
+            alt: [tur?.textContent.trim(), tarih?.textContent.trim()].filter(Boolean).join(' · '),
+            ikon: tur?.querySelector('svg') || '#kenar-menu [data-alt-liste] svg',
+            href: new URL(kart.getAttribute('href'), location.href).href,
+          };
+        });
+      } catch (hata) {
+        if (hata.name === 'AbortError') return;
+        belgeSonuclari = [];
+      }
+      if (aramaIstegi === istek) ciz();
+    }
+
+    girdi.addEventListener('input', () => {
+      secili = 0;
+      clearTimeout(aramaZamani);
+      const sorgu = girdi.value.trim();
+      aramaZamani = setTimeout(() => belgeAra(sorgu), 220);
+      ciz();
+    });
+    girdi.addEventListener('keydown', (olay) => {
+      if (olay.key === 'ArrowDown') { olay.preventDefault(); sec(secili + 1); }
+      else if (olay.key === 'ArrowUp') { olay.preventDefault(); sec(secili - 1); }
+      else if (olay.key === 'Home' && olay.ctrlKey) { olay.preventDefault(); sec(0); }
+      else if (olay.key === 'End' && olay.ctrlKey) { olay.preventDefault(); sec(ogeler.length - 1); }
+      else if (olay.key === 'Enter') { olay.preventDefault(); calistir(secili); }
+    });
+
+    function paletiAc() {
+      if (palet.open) { girdi.select(); return; }
+      mobilMenu(false);
+      kullaniciMenusuAc(false);
+      girdi.value = '';
+      belgeSonuclari = null;
+      secili = 0;
+      ciz();
+      pencereAc(palet);
+      girdi.focus();
+    }
+    $$('[data-komut-ac]').forEach((d) => d.addEventListener('click', paletiAc));
+    document.addEventListener('keydown', (olay) => {
+      if ((olay.ctrlKey || olay.metaKey) && !olay.altKey && olay.key.toLowerCase() === 'k') {
+        olay.preventDefault();
+        paletiAc();
+      }
+    });
+  }
 
   /* ---------------------------------------------------------------- bildirimler */
   function bildirimKapat(bildirim) {
@@ -245,13 +576,42 @@
   function sayaclariGuncelle(veri) {
     Object.entries(veri.sayaclar || {}).forEach(([kod, adet]) => {
       const el = $('[data-tur-sayaci="' + kod + '"]');
-      if (el) el.textContent = adet;
+      if (el) {
+        el.textContent = adet;
+        el.closest('[data-ipucu]')?.setAttribute('data-ipucu-ek', adet);
+      }
     });
+    if (typeof veri.isleniyor === 'number') {
+      const rozet = $('[data-isleniyor-rozeti]');
+      if (rozet) {
+        rozet.textContent = veri.isleniyor;
+        rozet.hidden = !veri.isleniyor;
+        const oge = rozet.closest('[data-ipucu]');
+        if (veri.isleniyor) oge?.setAttribute('data-ipucu-ek', veri.isleniyor + ' işleniyor');
+        else oge?.removeAttribute('data-ipucu-ek');
+      }
+      const nokta = $('[data-isleniyor-nokta]');
+      if (nokta) nokta.hidden = !veri.isleniyor;
+    }
     const not = $('[data-isleniyor-bilgisi]');
     if (not) {
       not.hidden = !veri.isleniyor;
       $('[data-isleniyor-sayisi]', not).textContent = veri.isleniyor;
     }
+  }
+
+  // "Isleniyor" rozeti yumusakca "Tamamlandi"ya doner; kart az sonra yenilenir.
+  function rozetiTamamla(rozet) {
+    if (azHareket) return Promise.resolve();
+    return new Promise((bitti) => {
+      rozet.classList.add('degisiyor');
+      setTimeout(() => {
+        $('[data-rozet-metni]', rozet).textContent = 'Tamamlandı';
+        rozet.setAttribute('data-tamam', '');
+        rozet.classList.remove('degisiyor');
+        setTimeout(bitti, 900);
+      }, 200);
+    });
   }
 
   // Listelerdeki islenmekte olan kartlar: biten kart, sayfanin guncel halinden
@@ -262,7 +622,12 @@
       sayaclariGuncelle(veri);
       const biten = Object.entries(veri.belgeler || {}).filter(([, d]) => !islenmekte(d.durum)).map(([id]) => id);
       if (!biten.length) return;
+      const donusum = Promise.all(biten.map((id) => {
+        const rozet = $('.belge-karti[data-belge-id="' + id + '"] [data-isleme-rozeti]');
+        return rozet && veri.belgeler[id].durum !== 'hata' ? rozetiTamamla(rozet) : null;
+      }));
       const yanit = await fetch(location.href, { credentials: 'same-origin' });
+      await donusum;
       const yeni = new DOMParser().parseFromString(await yanit.text(), 'text/html');
       biten.forEach((id) => {
         const eski = $('.belge-karti[data-belge-id="' + id + '"]');
@@ -270,6 +635,7 @@
         if (!eski) return;
         if (!guncel) { eski.removeAttribute('data-isleniyor'); return; }
         guncel.classList.remove('kart-giris');
+        guncel.classList.add('netlesiyor'); // kucuk resim netlesir, tur rozeti yerine oturur (etkiler.css)
         const kart = document.adoptNode(guncel);
         eski.replaceWith(kart);
         gorselleriHazirla(kart);
@@ -284,7 +650,11 @@
     yoklayici(() => [kimlik], (veri) => {
       sayaclariGuncelle(veri);
       const d = veri.belgeler?.[kimlik];
-      if (d && !islenmekte(d.durum)) location.reload();
+      // Bitince onizlemenin uzerinden son bir tarama isigi iner (etkiler.js), sonra sayfa yenilenir.
+      if (d && !islenmekte(d.durum)) {
+        const bitis = window.ArcEtki?.taramaBitir?.() || Promise.resolve();
+        bitis.then(() => location.reload(), () => location.reload());
+      }
     })();
   }
 
@@ -469,6 +839,7 @@
       const sonuc = $('[data-sonuc]', oge.satir);
       const rozet = $('[data-rozet-sablonu="' + d.tur + '"]');
       if (rozet) sonuc.appendChild(rozet.content.cloneNode(true));
+      window.ArcEtki?.yukleUcusu?.(oge.satir, d.tur); // satir ilgili kategori karosuna ucar (etkiler.js)
       if (d.kirpma_kontrol) {
         const kontrol = document.createElement('a');
         kontrol.href = oge.adres + '?koseler=1';
@@ -622,7 +993,7 @@
     const yaziyor = olay.target.closest?.('input, textarea, select, [contenteditable="true"]');
     const arama = $('#ust-arama');
     if (!arama) return;
-    if ((olay.key === '/' && !yaziyor) || ((olay.ctrlKey || olay.metaKey) && olay.key.toLowerCase() === 'k')) {
+    if (olay.key === '/' && !yaziyor) {
       olay.preventDefault();
       arama.focus();
       arama.select();
@@ -630,20 +1001,25 @@
     if (olay.key === 'Escape' && kok.classList.contains('menu-acik')) mobilMenu(false);
   });
 
-  /* ---------------------------------------------------------------- sayaclar */
-  function sayacCalistir(el, hedef) {
-    if (azHareket || hedef === 0) { el.textContent = hedef.toLocaleString('tr'); return; }
-    const sure = Math.min(200, 120 + hedef * 4); // sayfa acilisini bekletmesin
-    const bas = performance.now();
-    const adim = (simdi) => {
-      const t = Math.min((simdi - bas) / sure, 1);
-      const yumusak = 1 - Math.pow(1 - t, 3);
-      el.textContent = Math.round(hedef * yumusak).toLocaleString('tr');
-      if (t < 1) requestAnimationFrame(adim);
+  /* ---------------------------------------------------------------- sayaclar
+   Sayilar 0'dan hedef degere sayar (yavaslayarak, ~800 ms); yerel bicimle
+   (1.234) yazilir. Hareket azaltildiysa dogrudan son deger. */
+  $$('[data-sayac]').forEach((el) => {
+    const hedef = Number(el.dataset.sayac) || 0;
+    const yaz = (n) => { el.textContent = Math.round(n).toLocaleString('tr'); };
+    if (azHareket || !hedef) { yaz(hedef); return; }
+    const sure = 800;
+    const gecikme = 120 + (Number(getComputedStyle(el.closest('.kart-giris, .bolum-giris') || el).getPropertyValue('--i')) || 0) * 90;
+    let bas = null;
+    yaz(0);
+    const kare = (t) => {
+      bas ??= t + gecikme;
+      const ilerleme = Math.min(Math.max((t - bas) / sure, 0), 1);
+      yaz(hedef * (1 - Math.pow(1 - ilerleme, 4)));
+      if (ilerleme < 1) requestAnimationFrame(kare);
     };
-    requestAnimationFrame(adim);
-  }
-  $$('[data-sayac]').forEach((el) => sayacCalistir(el, Number(el.dataset.sayac) || 0));
+    requestAnimationFrame(kare);
+  });
 
   /* ---------------------------------------------------------------- isik kutusu (tam ekran onizleme) */
   const isikKutusu = $('#isik-kutusu');
@@ -1292,4 +1668,288 @@
       }, 1800);
     });
   });
+
+  /* ---------------------------------------------------------------- tarayici algilama
+   Bagli tarayicilar birkac saniyede bir sorulur (sekme gizliyken durur). Yeni
+   tarayici takilinca bu sekmede "Tarayici bulundu" bildirimi cikar; "Tara"
+   dugmeleri yalnizca tarayici bagliyken gorunur. Bildirilen tarayicilar
+   sekmeye ozel (sessionStorage) tutulur: sayfa degisince yeniden bildirilmez,
+   cikarilip yeniden takilinca bildirilir. */
+  const tarayiciDinleyicileri = [];
+  let taramaSuruyor = false;
+  let tarayicilariHemenSor = () => {};
+  if (TARAYICI_ADRESI) {
+    const BILINEN_ANAHTARI = 'bilinenTarayicilar';
+    let bilinen = [];
+    try { bilinen = JSON.parse(sessionStorage.getItem(BILINEN_ANAHTARI) || '[]'); } catch (e) { /* yok */ }
+    const taraSayfasindaMi = () => Boolean($('[data-tara-sayfasi]'));
+
+    const tarayiciBildir = (ad) => {
+      const sablon = $('#tarayici-bildirim-sablonu');
+      const kap = $('[data-bildirimler]');
+      if (!sablon || !kap) return;
+      const bildirim = sablon.content.firstElementChild.cloneNode(true);
+      $('[data-ad]', bildirim).textContent = ad;
+      $('[data-bildirim-kapat]', bildirim).addEventListener('click', () => bildirimKapat(bildirim));
+      $('.bildirim-sure', bildirim).addEventListener('animationend', () => bildirimKapat(bildirim));
+      kap.append(bildirim);
+    };
+
+    const dugmeleriGuncelle = (bagli, liste = []) => {
+      $$('[data-tara-menu], [data-tara-baglantisi]').forEach((el) => {
+        if (el.getAttribute('aria-current') !== 'page') el.hidden = !bagli;
+      });
+      // Panel'deki tarayici bilgi kutusu: bagli mi, hangi tarayici.
+      const kart = $('[data-tarayici-karti]');
+      if (kart) {
+        kart.dataset.durum = bagli ? 'bagli' : 'yok';
+        $('[data-tarayici-ozet]', kart).textContent = liste.length > 1 ? liste.length + ' tarayıcı bağlı' : bagli ? 'Bağlı' : 'Bağlı değil';
+        $('[data-tarayici-ad]', kart).textContent = bagli ? liste.map((t) => t.ad).join(', ') : 'Tarayıcıyı bilgisayara bağlayıp açın';
+        const tara = $('[data-tarayici-tara]', kart);
+        if (tara) tara.hidden = !bagli;
+      }
+      const dugme = $('[data-tara-dugmesi]');
+      if (dugme && !taraSayfasindaMi()) dugme.hidden = !bagli;
+      if (!bagli) $$('[data-tarayici-bildirimi]').forEach(bildirimKapat);
+    };
+
+    let zamanlayici = null;
+    const planla = (ms) => {
+      clearTimeout(zamanlayici);
+      if (!document.hidden) zamanlayici = setTimeout(sor, ms ?? (taramaSuruyor ? 1000 : 3000));
+    };
+    async function sor() {
+      try {
+        const yanit = await fetch(TARAYICI_ADRESI, { credentials: 'same-origin', headers: { Accept: 'application/json' } });
+        const veri = await jsonOku(yanit);
+        const liste = veri.tarayicilar || [];
+        if (!taraSayfasindaMi()) liste.filter((t) => !bilinen.includes(t.id)).forEach((t) => tarayiciBildir(t.ad));
+        bilinen = liste.map((t) => t.id);
+        try { sessionStorage.setItem(BILINEN_ANAHTARI, JSON.stringify(bilinen)); } catch (e) { /* gizli pencere */ }
+        dugmeleriGuncelle(liste.length > 0, liste);
+        tarayiciDinleyicileri.forEach((dinleyici) => dinleyici(veri));
+      } catch (hata) { /* ag hatasi ya da oturum dustu: bir sonraki turda yeniden denenir */ }
+      planla();
+    }
+    tarayicilariHemenSor = () => planla(0);
+    document.addEventListener('visibilitychange', () => planla(0));
+    planla(0);
+  }
+
+  /* ---------------------------------------------------------------- tarama (tara.html)
+   "Tara" / "Sonraki sayfa" / "Bitir" / "Vazgec" istekleri fetch ile gider;
+   tarama surerken form yerine buyuk bir ilerleme paneli gorunur. Besleyiciden
+   gelen sayfa sayisi durum yoklamasindan okunur. Belge olusunca sayfasina gidilir. */
+  const taraSayfasi = $('[data-tara-sayfasi]');
+  const taraFormu = $('[data-tara-formu]');
+  if (taraSayfasi) {
+    const ilerlemePaneli = $('[data-tara-ilerleme]', taraSayfasi);
+    const hataKutusu = $('[data-tara-hata]', taraSayfasi);
+    let bekleyenSayfa = Number($('[data-tara-sayfa-sayisi]', taraSayfasi)?.textContent || 0);
+    let bitiriliyor = false;
+
+    const ilerlemeYaz = (baslik, metin) => {
+      $('[data-tara-ilerleme-baslik]', ilerlemePaneli).textContent = baslik;
+      $('[data-tara-ilerleme-metin]', ilerlemePaneli).textContent = metin;
+    };
+    const hataGoster = (mesaj) => {
+      $('[data-tara-hata-metin]', hataKutusu).textContent = mesaj;
+      hataKutusu.hidden = !mesaj;
+    };
+    const durumuGoster = (sayi) => {
+      bekleyenSayfa = sayi;
+      $('[data-tara-basla]', taraFormu).hidden = sayi > 0;
+      $('[data-tara-sonraki]', taraFormu).hidden = sayi === 0;
+      $('[data-tara-sayfa-sayisi]', taraFormu).textContent = sayi;
+    };
+
+    tarayiciDinleyicileri.push((veri) => {
+      if (taramaSuruyor) {
+        const alinan = veri.ilerleme?.sayfa || 0;
+        if (!bitiriliyor && alinan > 0) ilerlemeYaz('Taranıyor…', alinan + '. sayfa alındı, devam ediyor…');
+        return;
+      }
+      // Tarayici takildi ya da cikarildi: sayfa guncel haliyle yeniden acilir.
+      if ((veri.tarayicilar || []).length !== Number(taraSayfasi.dataset.tarayiciSayisi)) location.reload();
+    });
+
+    taraFormu?.addEventListener('submit', async (olay) => {
+      olay.preventDefault();
+      if (taramaSuruyor) return;
+      const dugme = olay.submitter;
+      const adres = dugme?.getAttribute('formaction') || taraFormu.action;
+      const iptal = dugme?.hasAttribute('data-tara-iptal');
+      bitiriliyor = Boolean(dugme?.hasAttribute('data-tara-bitir'));
+      hataGoster('');
+      taramaSuruyor = true;
+      if (!iptal) {
+        if (bitiriliyor) ilerlemeYaz('Belge hazırlanıyor…', bekleyenSayfa + ' sayfa tek belge olarak kaydediliyor.');
+        else ilerlemeYaz('Taranıyor…', bekleyenSayfa ? (bekleyenSayfa + 1) + '. sayfa taranıyor, lütfen bekleyin.'
+                                                      : 'Tarayıcı çalışıyor, lütfen bekleyin.');
+        taraFormu.hidden = true;
+        ilerlemePaneli.hidden = false;
+        tarayicilariHemenSor();
+      }
+      let gidiliyor = false;
+      try {
+        const yanit = await fetch(adres, {
+          method: 'POST', body: new FormData(taraFormu), credentials: 'same-origin', headers: { Accept: 'application/json' },
+        });
+        const veri = await jsonOku(yanit);
+        if (veri.adres) {
+          gidiliyor = true;
+          ilerlemeYaz('Tamamlandı', 'Belge açılıyor…');
+          location.href = veri.adres;
+          return;
+        }
+        if (veri.hata) hataGoster(veri.hata);
+        durumuGoster(veri.sayfa_sayisi || 0);
+      } catch (hata) {
+        hataGoster(hata.message.startsWith('Oturumunuz') ? hata.message
+                                                         : 'Bir sorun oluştu. Sayfayı yenileyip yeniden deneyin.');
+      } finally {
+        if (!gidiliyor) {
+          taramaSuruyor = false;
+          ilerlemePaneli.hidden = true;
+          taraFormu.hidden = false;
+        }
+      }
+    });
+  }
+
+  /* ---------------------------------------------------------------- tarama klasorleri (klasorler.html)
+   "Taradigim belgeler gorunmuyor": kullanici bir sayfa tarar, son dakikalarda
+   olusan dosyalar onizlemeleriyle gosterilir; "Evet, bu" o klasoru ekler.
+   "Klasoru kendim secegim": sunucu bilgisayarinin klasorleri pencerede gezilir.
+   Klasorde dosya varsa "hepsi mi, bundan sonrakiler mi?" sorulur. */
+  const klasorBul = $('[data-klasor-bul]');
+  if (klasorBul) {
+    const csrf = $('[data-klasor-csrf]', klasorBul).value;
+    const hataKutusu = $('[data-klasor-hata]', klasorBul);
+    const getirJson = async (adres, govde) => {
+      const yanit = await fetch(adres, {
+        method: govde ? 'POST' : 'GET', body: govde, credentials: 'same-origin', headers: { Accept: 'application/json' },
+      });
+      const veri = await jsonOku(yanit);
+      if (veri.hata) throw new Error(veri.hata);
+      return veri;
+    };
+    const sadeHata = (hata) => (hata instanceof TypeError || hata.message.startsWith('Sunucu')
+      ? 'Bir sorun oluştu. Sayfayı yenileyip yeniden deneyin.' : hata.message);
+    const hataGoster = (mesaj) => {
+      $('[data-klasor-hata-metin]', hataKutusu).textContent = mesaj || '';
+      hataKutusu.hidden = !mesaj;
+    };
+    const adimaGec = (ad) => {
+      $$('[data-adim]', klasorBul).forEach((el) => { el.hidden = el.dataset.adim !== ad; });
+      hataGoster('');
+    };
+
+    // Klasoru ekler; dosya varsa once sorar. secim: {anahtar} ya da {yol}.
+    let bekleyenSecim = null;
+    async function ekle(secim, mevcutlar) {
+      const govde = new FormData();
+      govde.append('csrf_token', csrf);
+      Object.entries(secim).forEach(([k, v]) => govde.append(k, v));
+      if (mevcutlar) govde.append('mevcutlar', mevcutlar);
+      try {
+        const veri = await getirJson(klasorBul.dataset.ekleAdresi, govde);
+        if (veri.soru) {
+          bekleyenSecim = secim;
+          $('[data-soru-sayi]', klasorBul).textContent = veri.sayi;
+          $('[data-soru-yol]', klasorBul).textContent = veri.yol;
+          adimaGec('soru');
+          return;
+        }
+        location.href = veri.adres;
+      } catch (hata) { hataGoster(sadeHata(hata)); }
+    }
+    $$('[data-mevcutlar]', klasorBul).forEach((dugme) => dugme.addEventListener('click', () => {
+      if (bekleyenSecim) ekle(bekleyenSecim, dugme.dataset.mevcutlar);
+    }));
+
+    // -- son taranan belgeyi bulma
+    async function ara() {
+      adimaGec('araniyor');
+      try {
+        const veri = await getirJson(klasorBul.dataset.araAdresi);
+        if (!veri.dosyalar.length) { adimaGec('yok'); return; }
+        const liste = $('[data-sonuc-listesi]', klasorBul);
+        const sablon = $('#bulunan-dosya');
+        liste.replaceChildren(...veri.dosyalar.map((dosya) => {
+          const oge = sablon.content.firstElementChild.cloneNode(true);
+          $('[data-onizleme]', oge).src = dosya.onizleme;
+          $('[data-onizleme]', oge).alt = dosya.ad;
+          $('[data-ad]', oge).textContent = dosya.ad;
+          $('[data-klasor]', oge).textContent = dosya.klasor;
+          $('[data-bu]', oge).addEventListener('click', () => ekle({ anahtar: dosya.anahtar }));
+          return oge;
+        }));
+        adimaGec('sonuc');
+      } catch (hata) {
+        adimaGec('tara');
+        hataGoster(sadeHata(hata));
+      }
+    }
+    $$('[data-bul-basla]', klasorBul).forEach((d) => d.addEventListener('click', () => adimaGec('tara')));
+    $$('[data-bul-ara]', klasorBul).forEach((d) => d.addEventListener('click', ara));
+    $$('[data-bul-vazgec]', klasorBul).forEach((d) => d.addEventListener('click', () => adimaGec('bas')));
+    if (klasorBul.dataset.hemen) adimaGec('tara');
+
+    // -- klasor gezgini
+    const gezgin = $('[data-klasor-gezgini]');
+    const gezginListe = $('[data-gezgin-liste]', gezgin);
+    const gezginHata = $('[data-gezgin-hata]', gezgin);
+    const secDugmesi = $('[data-gezgin-sec]', gezgin);
+    let gezginDurum = { yol: null, ust: null };
+
+    const satir = (ad, tiklaninca) => {
+      const oge = $('#gezgin-satiri').content.firstElementChild.cloneNode(true);
+      $('[data-ad]', oge).textContent = ad;
+      $('[data-gezgin-oge]', oge).addEventListener('click', tiklaninca);
+      return oge;
+    };
+    async function gez(yol) {
+      gezginHata.hidden = true;
+      try {
+        const veri = await getirJson(klasorBul.dataset.gezAdresi + (yol ? '?yol=' + encodeURIComponent(yol) : ''));
+        gezginDurum = veri;
+        $('[data-gezgin-yol]', gezgin).textContent = veri.yol || 'Bu bilgisayar';
+        $('[data-gezgin-geri]', gezgin).disabled = !veri.yol;
+        secDugmesi.disabled = !veri.yol;
+        const ogeler = [
+          ...veri.kisayollar.map((k) => satir(k.ad, () => gez(k.yol))),
+          ...veri.suruculer.map((s) => satir(s.ad + ' sürücüsü', () => gez(s.yol))),
+          ...veri.klasorler.map((k) => satir(k.ad, () => gez(k.yol))),
+        ];
+        if (!ogeler.length) {
+          const bos = document.createElement('li');
+          bos.className = 'px-4 py-6 text-center text-sm text-metin-3';
+          bos.textContent = 'Bu klasörün içinde başka klasör yok.';
+          ogeler.push(bos);
+        }
+        gezginListe.replaceChildren(...ogeler);
+        gezginListe.scrollTop = 0;
+      } catch (hata) {
+        gezginHata.textContent = sadeHata(hata);
+        gezginHata.hidden = false;
+      }
+    }
+    $('[data-gezgin-geri]', gezgin).addEventListener('click', () => {
+      if (gezginDurum.yol) gez(gezginDurum.ust || null);
+    });
+    secDugmesi.addEventListener('click', () => {
+      if (!gezginDurum.yol) return;
+      pencereKapat(gezgin);
+      ekle({ yol: gezginDurum.yol });
+    });
+    $$('[data-gezgin-ac]', klasorBul).forEach((d) => d.addEventListener('click', () => {
+      pencereAc(gezgin);
+      gez(null);
+    }));
+  }
+
+  $$('[data-klasor-kaldir]').forEach((dugme) => dugme.form.addEventListener('submit', (olay) => {
+    if (!confirm('Bu klasör artık izlenmesin mi? İçindeki dosyalar silinmez.')) olay.preventDefault();
+  }));
 })();

@@ -5,6 +5,12 @@ Flask-Login==0.6.3
 Flask-WTF==1.3.0
 Flask-Limiter==4.1.1
 gunicorn==26.2.0
+# Windows/yerel mod sunucusu (sunucu.py); gunicorn Windows'ta calismaz
+waitress==3.0.2
+# Tarama klasorunun izlenmesi (klasor_izleme.py)
+watchdog==6.0.0
+# Bagli tarayicidan dogrudan tarama (tarayici_wia.py, TARAYICI_WIA=1); yalnizca Windows
+pywin32==312 ; sys_platform == "win32"
 pytesseract==0.3.13
 pillow==12.3.0
 pymupdf==1.28.2

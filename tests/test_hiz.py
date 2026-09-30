@@ -249,17 +249,59 @@ def test_derlenmis_tailwind_ve_uzun_statik_onbellek(girisli):
     assert re.search(r'src="/static/app\.js\?v=\d+"', html)
 
 
-def test_sayfa_gecis_animasyonlari_en_fazla_200ms():
-    css = (KOK / "static" / "style.css").read_text(encoding="utf-8")
+def test_arayuz_animasyonlari_300_800ms():
+    """Tasarim kurali: ana animasyon ve gecisler 300-800 ms (gecikmeler dahil her deger en
+    fazla 800 ms); yumusak cikis egrisi; kartlar ve bolumler sirayla gelir. Mikro gecisler
+    (hover rengi, ipucu) 300 ms'nin altinda kalabilir. Surekli akan arka plan isiklari
+    (aurora, karsilama agi, kenar isini) ve donen gostergeler (iskelet, nabiz) haric tutulur;
+    onlar ambiyanstir ve prefers-reduced-motion'da kapatilir."""
+    css = (KOK / "static" / "style.css").read_text(encoding="utf-8") + "\n" + (KOK / "static" / "etkiler.css").read_text(encoding="utf-8")
 
-    def sure(secici):
+    def sureler(secici):
         kural = css[css.index(secici):]
         kural = kural[:kural.index("}")]
-        ms = [float(s) * (1000 if b == "s" else 1) for s, b in re.findall(r"(\d+(?:\.\d+)?)(ms|s)\b", kural)]
-        return sum(ms)  # sure + gecikme
+        return [float(s) * (1000 if b == "s" else 1) for s, b in re.findall(r"(\d+(?:\.\d+)?)(ms|s)\b", kural)]
 
-    for secici in ("::view-transition-old(icerik)", "::view-transition-new(icerik)", ".guven-dolgu", ".kota-dolgu"):
-        assert sure(secici) <= 200, secici
+    # Her deger en fazla 800 ms.
+    for secici in ("::view-transition-old(icerik)", ".sayfa-icerik { animation", ".kart-giris {", ".guven-dolgu", ".kota-dolgu",
+                   ".bildirim {", "dialog.pencere[open] > *", ".kullanici-menusu {\n", ".aktif-gosterge {", ".grup-icerik {",
+                   ".bolum-giris {", ".spot-kart {", ".spot-cubuk i {", ".alt-liste::after {\n  background", ".ocr-kutu.ocr-oynat .ocr-satir",
+                   ".tarama-netles", "::view-transition-group(belge-gorsel)", ".karo-vurgu",
+                   "html.tema-gecisi::view-transition-new(root) {\n  animation: tema-sil"):
+        assert sureler(secici) and max(sureler(secici)) <= 800, secici
+    # Ana animasyonlar 300 ms'den kisa olmaz.
+    for secici in (".sayfa-icerik { animation", ".kart-giris {", ".aktif-gosterge {", ".grup-icerik {", ".bolum-giris {",
+                   ".spot-cubuk i {", ".alt-liste::after {\n  background", ".ocr-kutu.ocr-oynat .ocr-satir", "::view-transition-group(belge-gorsel)",
+                   "html.tema-gecisi::view-transition-new(root) {\n  animation: tema-sil"):
+        assert max(sureler(secici)) >= 300, secici
     kart = css[css.index(".kart-giris {"):]
-    kart = kart[:kart.index("}")]
-    assert "160ms" in kart and "min(var(--i, 0), 8) * 5ms" in kart  # 160 + en fazla 40 ms kademe
+    assert "animation: icerik-gir" in kart[:kart.index("}")] and "var(--i" in kart[:kart.index("}")]
+    bolum = css[css.index(".bolum-giris {"):]
+    assert "animation: bolum-gir" in bolum[:bolum.index("}")] and "var(--i" in bolum[:bolum.index("}")]
+    assert "--yumusak: cubic-bezier(0.22, 1, 0.36, 1)" in css
+    # Surekli akan isiklar hareket azaltmada durur.
+    azalt = css[css.rindex("prefers-reduced-motion: reduce"):]
+    assert ".aurora i" in azalt and ".karsilama-ag i" in azalt and ".kenar-isini::before" in azalt
+
+
+def test_etkiler_yalnizca_gorunum_ve_dis_adres_yok():
+    """Gorsel etkiler yalnizca gorunumdur: dis adres yuklemez (yerel mod) ve anahtar kareler
+    yerlesimi degistiren ozellikleri (width/height/top/left/margin) animasyonla oynatmaz."""
+    css = (KOK / "static" / "etkiler.css").read_text(encoding="utf-8")
+    js = (KOK / "static" / "etkiler.js").read_text(encoding="utf-8")
+    for metin in (css, js):
+        assert "https://" not in metin and "http://" not in metin.replace("http://www.w3.org/2000/svg", "")
+
+    def govde(ad):
+        bas = css.index("@keyframes " + ad)
+        i = css.index("{", bas)
+        derinlik = 0
+        for j in range(i, len(css)):
+            derinlik += css[j] == "{"
+            derinlik -= css[j] == "}"
+            if derinlik == 0:
+                return css[i:j + 1]
+
+    for ad in ("bolum-gir", "agac-dol", "tarama-gecis", "netles", "rozet-otur", "ocr-belir", "cubuk-buyu", "kenar-isini",
+               "aurora-1", "ag-1"):
+        assert not re.search(r"(?<![-\w])(width|height|top|left|margin)\s*:", govde(ad)), ad

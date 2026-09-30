@@ -3,6 +3,7 @@
 import io
 import json
 import os
+import sys
 from datetime import datetime, timezone
 from pathlib import Path
 from urllib.parse import urlsplit
@@ -13,6 +14,7 @@ from flask import (
     Response,
     abort,
     flash,
+    jsonify,
     redirect,
     render_template,
     request,
@@ -40,15 +42,29 @@ import database
 import excel
 import goruntu_duzelt
 import isleme
+import izlenen_klasorler
 import kimlik
+import klasor_izleme
 import ocr
 import onbellek
 import pdf_uret
 import tarama
+import tarama_gunlugu
 import word_uret
+import yerel_mod
 from database import BEKLIYOR, DUSUK_GUVEN_SINIRI, HATA, ISLENIYOR, TAMAMLANDI, TURLER, VARSAYILAN_TUR
 
 load_dotenv()
+
+# YEREL_MOD=1: veritabani bu bilgisayarda ya da yerel agda olmali (yerel_mod.py).
+# Kurala uymayan ayarla uygulama hic baslamaz, nedeni ekrana yazilir.
+try:
+    yerel_mod.denetle()
+except yerel_mod.YerelModHatasi as _hata:
+    raise SystemExit(f"ArcBase başlatılamadı: {_hata}") from None
+
+# Alt bilgide gosterilen surum (yeni surumde elle artirilir).
+SURUM = "1.1.0"
 
 # Uzanti -> MIME tipi; izin verilen dosya turleri bu sozlukten belirlenir.
 IZINLI_TURLER = {
@@ -77,28 +93,42 @@ SIFRE_DENEME_SINIRI = "5 per minute;20 per hour"
 # Islenmis gorseller (tarama, duzeltilmis gorsel, onizleme) icin surec basina bellek.
 GORSEL_ONBELLEGI_MB = int(os.getenv("GORSEL_ONBELLEGI_MB") or 48)
 DURUM_SORGU_SINIRI = 50  # tek yoklamada sorulabilecek en fazla belge
+# Bu bilgisayara bagli tarayicidan dogrudan tarama (tarayici_wia.py): Windows'ta
+# varsayilan acik, TARAYICI_WIA=0 kapatir. Kapaliyken modul yuklenmez, "Tara" gorunmez.
+TARAYICI_WIA = sys.platform == "win32" and os.getenv("TARAYICI_WIA", "").strip() != "0"
+# Gelen belgeler kutusunun yoneticisi; bos ise ilk olusturulan kullanici.
+YONETICI_KULLANICI = (os.getenv("YONETICI_KULLANICI") or "").strip() or None
 
 # Dockerfile URETIM=1 ayarlar (Render). Yerelde "python app.py" gelistirme
 # modunda calisir: debug acik, cerezler HTTP uzerinden de gonderilir.
 URETIM = os.getenv("URETIM") == "1"
+# Yerel mod (kurum): uygulama yerel agda cogunlukla duz HTTP ile calisir
+# (sunucu.py / baslat.bat). HTTPS=1: onde TLS saglayan bir sunucu var.
+YEREL_MOD = yerel_mod.acik()
+HTTPS = os.getenv("HTTPS") == "1"
+# "Secure" cerez yalnizca HTTPS'te gonderilir; HTTP'de acik kalirsa giris
+# yapilamaz. Render (URETIM) her zaman HTTPS'tir; yerel modda yalnizca HTTPS=1.
+GUVENLI_CEREZ = HTTPS if YEREL_MOD else (URETIM or HTTPS)
 
 app = Flask(__name__)
 app.config["SECRET_KEY"] = os.getenv("SECRET_KEY") or (
-    None if URETIM else "gelistirme-anahtari"
+    None if URETIM or YEREL_MOD else "gelistirme-anahtari"
 )
 if not app.config["SECRET_KEY"]:
-    raise RuntimeError("SECRET_KEY tanımlı değil; üretimde zorunludur.")
+    raise RuntimeError("SECRET_KEY tanımlı değil; üretimde ve yerel modda zorunludur.")
 app.config["MAX_CONTENT_LENGTH"] = MAKS_DOSYA_BOYUTU
 app.config["WTF_CSRF_TIME_LIMIT"] = None  # token oturum boyunca gecerli
 app.config.update(
     SESSION_COOKIE_HTTPONLY=True,
     SESSION_COOKIE_SAMESITE="Lax",
-    SESSION_COOKIE_SECURE=URETIM,
+    SESSION_COOKIE_SECURE=GUVENLI_CEREZ,
     REMEMBER_COOKIE_HTTPONLY=True,
     REMEMBER_COOKIE_SAMESITE="Lax",
-    REMEMBER_COOKIE_SECURE=URETIM,
+    REMEMBER_COOKIE_SECURE=GUVENLI_CEREZ,
 )
-if URETIM:
+if HTTPS:
+    app.config["PREFERRED_URL_SCHEME"] = "https"
+if URETIM and not YEREL_MOD:
     # Render istekleri bir vekil sunucu (proxy) uzerinden iletir; gercek istemci
     # IP'si (hiz siniri icin) ve https bilgisi X-Forwarded-* basliklarindan okunur.
     app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1)
@@ -130,9 +160,22 @@ def _veritabanini_hazirla_bir_kez():
     global _veritabani_hazir
     if not _veritabani_hazir:
         database.veritabanini_hazirla()
+        database.yoneticiyi_belirle(YONETICI_KULLANICI)
         _veritabani_hazir = True
     if isleme.etkin():
         isleme.baslat()
+    if klasor_izleme.etkin():
+        klasor_izleme.baslat(KULLANICI_BELGE_LIMITI)
+    arka_plan_izleyicilerini_baslat()
+
+
+def arka_plan_izleyicilerini_baslat():
+    """Windows varsayilan tarama klasorleri ve tarayici algilama (Windows'ta,
+    arka plan iscisi aciksa; ikisi de surec basina bir kez baslar)."""
+    if klasor_izleme.varsayilan_klasorler_etkin():
+        klasor_izleme.varsayilan_baslat(KULLANICI_BELGE_LIMITI)
+    if TARAYICI_WIA and isleme.etkin():
+        _wia().izlemeyi_baslat()
 
 
 @app.before_request
@@ -152,7 +195,7 @@ def _statik_surum(endpoint, degerler):
     if endpoint != "static" or "filename" not in degerler:
         return
     dosya = degerler["filename"]
-    if dosya not in _statik_surumler or not URETIM:
+    if dosya not in _statik_surumler or not (URETIM or YEREL_MOD):
         yol = Path(app.static_folder) / dosya
         _statik_surumler[dosya] = int(yol.stat().st_mtime) if yol.is_file() else 0
     degerler["v"] = _statik_surumler[dosya]
@@ -255,6 +298,14 @@ def _ortak_degiskenler():
         "toplu_yukleme_siniri": TOPLU_YUKLEME_SINIRI,
         "pdf_birlestirme_siniri": PDF_BIRLESTIRME_SINIRI,
         "kota_doldu": toplam >= KULLANICI_BELGE_LIMITI,
+        "gelen_sayisi": sayaclar["gelen"],
+        "tarayici_wia": TARAYICI_WIA,
+        # Sayfa acilirken bilinen tarayicilar (yalnizca onbellek; WIA'ya sorulmaz).
+        "bagli_tarayicilar": _wia().bagli_tarayicilar(False) if TARAYICI_WIA else [],
+        "klasor_yonetimi_izinli": _klasor_yonetimi_izinli(),
+        "yerel_mod": YEREL_MOD,
+        "surum": SURUM,
+        "gelen_kutusu_var": _gelen_kutusu_var(sayaclar),
         "arama_sorgusu": request.args.get("q", ""),
     }
 
@@ -269,6 +320,14 @@ def _sayaclar():
     except database.VeritabaniHatasi:
         pass
     return database.sayac_ozeti([])
+
+
+def _gelen_kutusu_var(sayaclar=None):
+    """Menude "Gelen belgeler": yoneticide her zaman, eski yoneticide kutuda
+    belge kaldiysa."""
+    if not current_user.is_authenticated:
+        return False
+    return current_user.yonetici or (sayaclar or _sayaclar())["gelen"] > 0
 
 
 def _suzgecler(tur=None):
@@ -345,6 +404,8 @@ def kayit():
     if hata:
         return render_template("kayit.html", hata=hata, form=request.form), 400
 
+    database.yoneticiyi_belirle(YONETICI_KULLANICI)  # ilk kullanici yonetici olur
+    klasor_izleme.kullanici_klasoru_olustur(kullanici_adi)  # TARAMA_KLASORU\<ad> (ayar varsa)
     login_user(kimlik.Kullanici(database.kullanici_getir(kullanici_id)))
     flash(f"Hoş geldiniz, {kullanici_adi}! Hesabınız oluşturuldu.", "basari")
     return redirect(url_for("index"))
@@ -542,29 +603,8 @@ def _belge_kaydet(dosya, duzelt=True):
     if mime_type == PDF_MIME and len(veri) > MAKS_PDF_BOYUTU:
         raise YuklemeHatasi("PDF çok büyük. PDF dosyaları en fazla 5 MB olabilir.")
 
-    # Depolama sinirli (Neon 0.5 GB): gorsel hemen en fazla 2000 px JPEG'e
-    # kucultulup saklanir; islenene kadar listede kirpilmamis onizleme gorunur.
-    # Tam cozunurluklu dosya OCR icin isciye bellekte birakilir.
-    icerik, mime_type, dosya_adi, onizleme, orijinal = isleme.saklanacak_hal(
-        veri, mime_type, secure_filename(dosya.filename) or "belge"
-    )
-    belge_id = database.belge_ekle(
-        kullanici_id=current_user.id,
-        dosya_adi=dosya_adi,
-        mime_type=mime_type,
-        sifreli_icerik=crypto.sifrele(icerik),
-        sifreli_onizleme=crypto.sifrele(onizleme) if onizleme else None,
-        ocr_metni=None,
-        tur=VARSAYILAN_TUR,
-        guven=None,
-        aciklama=None,
-        orijinal_saklandi=orijinal,
-        isleme_durumu=BEKLIYOR,
-        isleme_bilgi={"asama": "goruntu", "duzelt": duzelt},
-    )
-    isleme.ham_birak(belge_id, veri)
-    isleme.uyandir()
-    return belge_id
+    # Depolama sinirli (Neon 0.5 GB): gorsel hemen kucultulup saklanir (isleme.kuyruga_ekle).
+    return isleme.kuyruga_ekle(current_user.id, veri, mime_type, secure_filename(dosya.filename) or "belge", duzelt)
 
 
 def _isleme_ozeti(satir):
@@ -613,6 +653,342 @@ def yeniden_isle(belge_id):
     isleme.uyandir()
     flash("Belge yeniden işleniyor.", "basari")
     return redirect(url_for("belge", belge_id=belge_id))
+
+
+# ---------------------------------------------------------------- tarayicidan tarama (WIA)
+
+def _wia():
+    """tarayici_wia modulu; yalnizca TARAYICI_WIA acikken ice aktarilir."""
+    if not TARAYICI_WIA:
+        abort(404)
+    import tarayici_wia
+
+    return tarayici_wia
+
+
+@app.route("/tarayici/durum")
+@login_required
+def tarayici_durumu():
+    """Sayfalarin birkac saniyede bir sordugu durum: bagli tarayicilar, suren
+    taramanin ilerlemesi ve kullanicinin bitirilmemis cok sayfali taramasi."""
+    wia = _wia()
+    return jsonify(
+        tarayicilar=wia.bagli_tarayicilar(),
+        ilerleme=wia.ilerleme(),
+        bekleyen_sayfa=wia.bekleyenler.sayi(current_user.id),
+    )
+
+
+@app.route("/tara")
+@login_required
+def tara():
+    wia = _wia()
+    return render_template(
+        "tara.html",
+        tarayicilar=wia.bagli_tarayicilar(),
+        bekleyen_sayfa=wia.bekleyenler.sayi(current_user.id),
+        cozunurlukler=wia.COZUNURLUKLER,
+        varsayilan_dpi=wia.VARSAYILAN_DPI,
+    )
+
+
+def _tarama_cevabi(hata=None, adres=None, sayfa_sayisi=0):
+    """fetch istegine JSON; formla gelen istege (JS kapali) yonlendirme."""
+    if _json_istegi():
+        if hata:
+            return jsonify(hata=hata, sayfa_sayisi=sayfa_sayisi), 400
+        return jsonify(bitti=adres is not None, adres=adres, sayfa_sayisi=sayfa_sayisi)
+    if hata:
+        flash(hata, "hata")
+    return redirect(adres or url_for("tara"))
+
+
+# Cok sayfali tarama 5 MB'yi asarsa sirayla daha kucuk/sikistirilmis denenir.
+PDF_KUCULTME_ADIMLARI = ((2480, 85), (2000, 70), (1650, 55))
+
+
+def _taramayi_kaydet(sayfalar, dpi):
+    """Taranan sayfalari tek belge olarak (tek sayfa gorsel, cok sayfa PDF)
+    kullanicinin arsivine ekler; belge adresini dondurur."""
+    wia = _wia()
+    from PIL import Image
+
+    for uzun_kenar, kalite in PDF_KUCULTME_ADIMLARI:
+        veri, mime_type, uzanti = klasor_izleme.sayfalari_birlestir(
+            [Image.open(io.BytesIO(s)) for s in sayfalar], dpi, uzun_kenar=uzun_kenar, kalite=kalite
+        )
+        if mime_type != PDF_MIME or len(veri) <= MAKS_PDF_BOYUTU:
+            break
+    else:
+        raise wia.TarayiciHatasi(f"{len(sayfalar)} sayfa tek belgeye sığmadı. Belgeyi iki parça halinde tarayın.")
+    dosya_adi = f"tarama_{datetime.now().strftime('%Y-%m-%d_%H%M%S')}{uzanti}"
+    belge_id = isleme.kuyruga_ekle(current_user.id, veri, mime_type, dosya_adi, kaynak="tarayici")
+    flash(f"{len(sayfalar)} sayfa tarandı ve arşivinize eklendi. Metni okunup türü belirleniyor; "
+          "sayfa hazır olunca kendiliğinden güncellenir.", "basari")
+    return url_for("belge", belge_id=belge_id)
+
+
+@app.route("/tara", methods=["POST"])
+@login_required
+def tara_baslat():
+    """Tek tusla tarama. Besleyicide (ADF) kagit varsa tum sayfalar alinip
+    hemen belge olur; camli yuzeyden taranan sayfa bekletilir ve kullanici
+    "Sonraki sayfa" (yeniden bu adres) ya da "Bitir" (/tara/bitir) der.
+    Tarayici ve ayarlar gonderilmezse: tek tarayici, 300 dpi, renkli."""
+    wia = _wia()
+    kimlik = current_user.id
+    try:
+        if _sayaclar()["toplam"] >= KULLANICI_BELGE_LIMITI:
+            raise wia.TarayiciHatasi(
+                f"Belge kotanız doldu ({KULLANICI_BELGE_LIMITI} belge). Yeni belge için eski belgelerden bazılarını silin."
+            )
+        cihaz = request.form.get("cihaz") or ""
+        if not cihaz:
+            tarayicilar = wia.bagli_tarayicilar()
+            if not tarayicilar:
+                raise wia.TarayiciHatasi(wia.BULUNAMADI)
+            if len(tarayicilar) > 1:
+                raise wia.TarayiciHatasi("Birden fazla tarayıcı bağlı; hangisiyle tarayacağınızı seçin.")
+            cihaz = tarayicilar[0]["id"]
+        if wia.bekleyenler.sayi(kimlik) >= wia.MAKS_SAYFA:
+            raise wia.TarayiciHatasi(f"Bir belgede en fazla {wia.MAKS_SAYFA} sayfa olabilir; \"Bitir\"e basın.")
+        dpi = request.form.get("dpi", wia.VARSAYILAN_DPI, type=int)
+        sayfalar, besleyici = wia.tara(
+            cihaz, dpi=dpi, renk=request.form.get("renk") or wia.VARSAYILAN_RENK,
+            kaynak=request.form.get("kaynak") or "otomatik",
+        )
+        if not sayfalar:
+            raise wia.TarayiciHatasi("Tarayıcıdan sayfa gelmedi. Kâğıdı yerleştirip yeniden deneyin.")
+        toplam = wia.bekleyenler.ekle(kimlik, sayfalar, dpi)
+        if not besleyici:
+            return _tarama_cevabi(sayfa_sayisi=toplam)  # camli yuzey: sonraki sayfa ya da bitir
+        tum_sayfalar, dpi = wia.bekleyenler.al(kimlik)
+        return _tarama_cevabi(adres=_taramayi_kaydet(tum_sayfalar, dpi), sayfa_sayisi=len(tum_sayfalar))
+    except wia.TarayiciHatasi as h:
+        return _tarama_cevabi(hata=str(h), sayfa_sayisi=wia.bekleyenler.sayi(kimlik))
+
+
+@app.route("/tara/bitir", methods=["POST"])
+@login_required
+def tara_bitir():
+    """Sayfa sayfa taranan belgeyi tamamlar: tum sayfalar tek belge olur."""
+    wia = _wia()
+    sayfalar, dpi = wia.bekleyenler.al(current_user.id)
+    if not sayfalar:
+        return _tarama_cevabi(hata="Kaydedilecek taranmış sayfa yok. Önce \"Tara\"ya basın.")
+    try:
+        return _tarama_cevabi(adres=_taramayi_kaydet(sayfalar, dpi), sayfa_sayisi=len(sayfalar))
+    except wia.TarayiciHatasi as h:
+        return _tarama_cevabi(hata=str(h))
+
+
+@app.route("/tara/iptal", methods=["POST"])
+@login_required
+def tara_iptal():
+    """Bitirilmemis taramanin sayfalarini atar."""
+    _wia().bekleyenler.al(current_user.id)
+    if _json_istegi():
+        return jsonify(bitti=False, adres=None, sayfa_sayisi=0)
+    flash("Tarama iptal edildi; taranan sayfalar kaydedilmedi.", "uyari")
+    return redirect(url_for("tara"))
+
+
+@app.route("/tarama-durumu")
+@login_required
+def tarama_durumu():
+    """Yonetici icin bilgi sayfasi: bagli tarayicilar, izlenen klasorler, son
+    aktarilan dosyalar ve son hatalar. Ayar degistirmez."""
+    if not current_user.yonetici:
+        abort(404)
+    return render_template(
+        "tarama_durumu.html",
+        tarayicilar=_wia().bagli_tarayicilar() if TARAYICI_WIA else None,
+        klasorler=klasor_izleme.izlenen_klasorler(),
+        aktarilanlar=tarama_gunlugu.son_aktarilanlar(),
+        hatalar=tarama_gunlugu.son_hatalar(),
+    )
+
+
+# ---------------------------------------------------------------- tarama klasorleri (bulma, secme, kaldirma)
+
+def _yerel_istek_mi():
+    """Istek ArcBase'in calistigi bilgisayarin kendisinden mi (127.0.0.1 / ::1)?
+    Vekil sunucu arkasinda (Render) hicbir istek yerel sayilmaz."""
+    if URETIM and not YEREL_MOD:
+        return False
+    return request.remote_addr in ("127.0.0.1", "::1")
+
+
+def _klasor_yonetimi_izinli():
+    """Klasor arama/gezinme ve izlenen klasorleri degistirme: yalnizca yonetici
+    ya da sunucu bilgisayarinin kendisi. Agdaki diger bilgisayarlar gormez."""
+    return current_user.is_authenticated and (current_user.yonetici or _yerel_istek_mi())
+
+
+def _klasor_yetkisi():
+    if not _klasor_yonetimi_izinli():
+        abort(404)
+    import klasor_secimi
+
+    return klasor_secimi
+
+
+@app.route("/klasorler")
+@login_required
+def klasorler():
+    klasor_secimi = _klasor_yetkisi()
+    return render_template(
+        "klasorler.html", klasorler=klasor_izleme.izlenen_klasorler(),
+        arama_dakikasi=klasor_secimi.SON_DOSYA_SN // 60, hemen_bul=request.args.get("bul") == "1",
+    )
+
+
+@app.route("/klasorler/son-dosyalar")
+@login_required
+def klasor_son_dosyalar():
+    """Kullanici klasorlerinde son 2 dakikada olusan gorsel/PDF dosyalari."""
+    klasor_secimi = _klasor_yetkisi()
+    dosyalar = []
+    for dosya in klasor_secimi.son_dosyalari_bul():
+        anahtar = klasor_secimi.anahtarlar.ver(current_user.id, dosya["yol"])
+        dosyalar.append({"anahtar": anahtar, "ad": dosya["ad"], "klasor": dosya["klasor"],
+                         "onizleme": url_for("klasor_onizleme", anahtar=anahtar)})
+    return jsonify(dosyalar=dosyalar)
+
+
+@app.route("/klasorler/onizleme/<anahtar>")
+@login_required
+def klasor_onizleme(anahtar):
+    """Yalnizca aramada bu kullaniciya bulunan dosyanin onizlemesi."""
+    klasor_secimi = _klasor_yetkisi()
+    yol = klasor_secimi.anahtarlar.yol(current_user.id, anahtar)
+    if yol is None:
+        abort(404)
+    try:
+        veri = klasor_secimi.onizleme_uret(yol)
+    except klasor_secimi.KlasorHatasi:
+        abort(404)
+    yanit = Response(veri, mimetype="image/jpeg")
+    yanit.headers["Cache-Control"] = "private, no-store"
+    return yanit
+
+
+@app.route("/klasorler/gez")
+@login_required
+def klasor_gez():
+    """Klasor secme penceresi: suruculer/kisayollar ya da bir klasorun alt klasorleri."""
+    klasor_secimi = _klasor_yetkisi()
+    try:
+        return jsonify(klasor_secimi.klasoru_listele(request.args.get("yol")))
+    except klasor_secimi.KlasorHatasi as hata:
+        return jsonify(hata=str(hata)), 400
+
+
+def _klasor_cevabi(hata=None, **veri):
+    if _json_istegi():
+        return (jsonify(hata=hata), 400) if hata else jsonify(**veri)
+    if hata:
+        flash(hata, "hata")
+    return redirect(url_for("klasorler"))
+
+
+@app.route("/klasorler/ekle", methods=["POST"])
+@login_required
+def klasor_ekle():
+    """Klasoru izlenen klasorlere ekler. Klasor ya aramada bulunan dosyanin
+    anahtariyla ("Bu belge") ya da gezinme penceresinden yoluyla gelir.
+    Klasorde dosya varsa once sorulur: hepsi mi, yalnizca bundan sonrakiler mi?"""
+    klasor_secimi = _klasor_yetkisi()
+    try:
+        anahtar = request.form.get("anahtar")
+        if anahtar:
+            dosya = klasor_secimi.anahtarlar.yol(current_user.id, anahtar)
+            if dosya is None:
+                raise klasor_secimi.KlasorHatasi("Süre doldu. Belgeyi yeniden arayın.")
+            yol = str(dosya.parent)
+        else:
+            yol = request.form.get("yol", "")
+        klasor = klasor_secimi.klasoru_dogrula(yol)
+    except klasor_secimi.KlasorHatasi as hata:
+        return _klasor_cevabi(hata=str(hata))
+    ayar = klasor_izleme.klasor_ayari()
+    if ayar and izlenen_klasorler.normal(ayar) == izlenen_klasorler.normal(klasor):
+        return _klasor_cevabi(hata="Bu klasör zaten izleniyor.")
+
+    mevcutlar = request.form.get("mevcutlar")  # "hepsi" | "sonrakiler" | yok: sor
+    sayi = klasor_izleme.mevcut_dosya_sayisi(klasor)
+    if mevcutlar not in ("hepsi", "sonrakiler"):
+        if sayi and _json_istegi():
+            return jsonify(soru=True, sayi=sayi, yol=str(klasor))
+        mevcutlar = "sonrakiler"
+    izlenen_klasorler.ekle(klasor, current_user.kullanici_adi, yalnizca_yeniler=mevcutlar != "hepsi")
+    klasor_izleme.varsayilan_baslat(KULLANICI_BELGE_LIMITI)
+    mesaj = f"“{klasor.name or klasor}” klasörü izleniyor. Bundan sonra buraya kaydedilen belgeler arşive gelir."
+    if mevcutlar == "hepsi" and sayi:
+        mesaj += f" İçindeki {sayi} belge de ekleniyor."
+    flash(mesaj, "basari")
+    return _klasor_cevabi(eklendi=True, adres=url_for("klasorler"))
+
+
+@app.route("/klasorler/kaldir", methods=["POST"])
+@login_required
+def klasor_kaldir():
+    """Klasoru izlemeyi birakir; icindeki dosyalara dokunulmaz."""
+    _klasor_yetkisi()
+    yol = request.form.get("yol", "")
+    kayit = next((k for k in klasor_izleme.izlenen_klasorler()
+                  if k["kaldirilabilir"] and izlenen_klasorler.normal(k["yol"]) == izlenen_klasorler.normal(yol)),
+                 None) if yol else None
+    if kayit is None:
+        return _klasor_cevabi(hata="Bu klasör izlenen klasörler arasında yok.")
+    izlenen_klasorler.kaldir(kayit["yol"], kayit["tur"] == klasor_izleme.VARSAYILAN_TUR, current_user.kullanici_adi)
+    flash("Klasör artık izlenmiyor. İçindeki dosyalara dokunulmadı.", "basari")
+    return _klasor_cevabi(kaldirildi=True, adres=url_for("klasorler"))
+
+
+# ---------------------------------------------------------------- gelen belgeler (yonetici)
+
+@app.route("/gelen")
+@login_required
+def gelen():
+    """Sahipsiz gelen belgeler (tarama klasorunun kokune dusenler). Yalnizca
+    yoneticinin kendi kutusu listelenir; baska kullanicilarin arsivleri degil."""
+    if not _gelen_kutusu_var():
+        abort(404)
+    return render_template(
+        "gelen.html",
+        belgeler=database.belgeleri_suz(current_user.id, gelen=True),
+        kullanicilar=database.kullanicilari_listele(),
+    )
+
+
+@app.route("/gelen/<int:belge_id>/ata", methods=["POST"])
+@login_required
+def gelen_ata(belge_id):
+    """Gelen belgeyi bir kullanicinin (ya da yoneticinin kendi) arsivine atar.
+    Atama belgenin atama_gecmisi'ne ve uygulama gunlugune yazilir."""
+    hedef_id = request.form.get("kullanici", type=int)
+    hedef = database.kullanici_getir(hedef_id) if hedef_id else None
+    if hedef is None:
+        flash("Atanacak kullanıcıyı seçin.", "hata")
+        return redirect(url_for("gelen"))
+    sonuc = database.gelen_ata(
+        current_user.id, current_user.kullanici_adi, belge_id, hedef["id"], hedef["kullanici_adi"],
+        KULLANICI_BELGE_LIMITI,
+    )
+    if sonuc == "yok":
+        abort(404)
+    if sonuc == "kota":
+        flash(f"{hedef['kullanici_adi']} kullanıcısının belge kotası dolu ({KULLANICI_BELGE_LIMITI} belge); "
+              "belge atanmadı.", "hata")
+        return redirect(url_for("gelen"))
+    app.logger.info("Gelen belge atandi: belge=%s yapan=%s kime=%s", belge_id, current_user.kullanici_adi,
+                    hedef["kullanici_adi"])
+    if hedef["id"] == current_user.id:
+        flash("Belge arşivinize alındı.", "basari")
+    else:
+        flash(f"Belge {hedef['kullanici_adi']} kullanıcısına atandı.", "basari")
+    return redirect(url_for("gelen"))
 
 
 @app.route("/kategori/<tur>")
@@ -679,6 +1055,7 @@ def belge(belge_id):
         kirpma_kontrol=bool(bilgi.get("kirpma_kontrol")),
         # Tarayici ciktisi algilandi, kirpilmadi (koseler elle kaydedilince kalkar).
         taranmis=bool(bilgi.get("taranmis")),
+        atama_kullanicilari=database.kullanicilari_listele() if kayit["gelen_kutusu"] else None,
     )
 
 
@@ -1091,5 +1468,6 @@ def indir(belge_id):
 
 
 if __name__ == "__main__":
-    # Sadece yerel gelistirme icin; yayinda gunicorn kullanilir (Dockerfile).
+    # Sadece gelistirme icin; yayinda gunicorn (Dockerfile), Windows'ta
+    # waitress (sunucu.py, baslat.bat) kullanilir.
       app.run(debug=True, port=5001)

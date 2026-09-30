@@ -1,0 +1,147 @@
+{% extends "base.html" %}
+{% import "_bilesenler.html" as ui with context %}
+{% block baslik %}Tarama klasörleri — ArcBase{% endblock %}
+
+{% block icerik %}
+{# Yalnizca yonetici ya da sunucu bilgisayarinin kendisi (app.py: _klasor_yonetimi_izinli).
+   "Taradigim belgeler gorunmuyor": kullanici bir sayfa tarar, son dakikalarda
+   olusan dosyalar onizlemeleriyle gosterilir, secilen dosyanin klasoru eklenir.
+   "Klasoru kendim secegim": sunucu bilgisayarinin klasorleri gezilir.
+   Davranis app.js'te (tarama klasorleri); JS kapaliyken yalnizca liste ve kaldirma calisir. #}
+{{ ui.sayfa_basligi([('Yönetim', none), ('Tarama klasörleri', none)], 'Tarama klasörleri',
+                   'Tarayıcınızın kaydettiği klasörler izlenir; oraya düşen belgeler kendiliğinden arşive gelir.') }}
+
+{% set kart = "kart-giris rounded-2xl border border-cizgi bg-kart p-5 shadow-kart sm:p-6" %}
+<section class="{{ kart }} max-w-3xl" style="--i: 2" data-klasor-bul data-hemen="{{ '1' if hemen_bul else '' }}"
+         data-ara-adresi="{{ url_for('klasor_son_dosyalar') }}" data-ekle-adresi="{{ url_for('klasor_ekle') }}"
+         data-gez-adresi="{{ url_for('klasor_gez') }}">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" data-klasor-csrf>
+
+  {# 1. baslangic #}
+  <div data-adim="bas">
+    <button type="button" class="btn btn-birincil h-14 w-full text-base sm:w-auto sm:px-8" data-bul-basla>
+      {{ ui.ikon('ara', 'w-5 h-5') }}Taradığım belgeler görünmüyor
+    </button>
+    <p class="mt-3">
+      <button type="button" class="text-sm font-medium text-marka-600 underline-offset-2 hover:underline dark:text-marka-400" data-gezgin-ac>
+        Klasörü kendim seçeceğim
+      </button>
+    </p>
+    <noscript><p class="mt-3 text-sm text-metin-3">Bu özellik için tarayıcınızda JavaScript açık olmalı.</p></noscript>
+  </div>
+
+  {# 2. kullanici bir sayfa tarar #}
+  <div data-adim="tara" hidden>
+    <p class="text-lg font-bold text-metin">Şimdi tarayıcınızla bir sayfa tarayın.</p>
+    <p class="mt-1 text-sm text-metin-2">
+      Her zamanki gibi tarayın (tarayıcının üzerindeki düğmeyle ya da kendi programıyla). Tarama bitince aşağıdaki düğmeye basın;
+      son {{ arama_dakikasi }} dakikada kaydedilen belgeleri Belgeler, Resimler, Masaüstü ve İndirilenler klasörlerinde arayacağız.
+    </p>
+    <div class="mt-4 flex flex-wrap items-center gap-3">
+      <button type="button" class="btn btn-birincil h-12 px-6 text-base" data-bul-ara>{{ ui.ikon('ara', 'w-5 h-5') }}Taradım, belgeyi bul</button>
+      <button type="button" class="btn btn-ikincil h-12" data-bul-vazgec>Vazgeç</button>
+    </div>
+  </div>
+
+  {# 3. araniyor #}
+  <div class="py-6 text-center" data-adim="araniyor" role="status" hidden>
+    <span class="donen-halka mx-auto block !h-10 !w-10 !border-4" aria-hidden="true"></span>
+    <p class="mt-4 text-base font-semibold text-metin">Belge aranıyor…</p>
+  </div>
+
+  {# 4. sonuclar #}
+  <div data-adim="sonuc" hidden>
+    <p class="text-lg font-bold text-metin">Taradığınız belge bu mu?</p>
+    <p class="mt-1 text-sm text-metin-2">Doğru belgenin altındaki “Evet, bu” düğmesine basın; o klasör izlenmeye başlar.</p>
+    <ul class="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-3" data-sonuc-listesi></ul>
+    <button type="button" class="btn btn-ikincil mt-4" data-bul-ara>{{ ui.ikon('yenile', 'w-4 h-4') }}Hiçbiri değil, yeniden ara</button>
+  </div>
+
+  {# 5. bulunamadi #}
+  <div data-adim="yok" hidden>
+    <p class="flex items-start gap-3 rounded-xl bg-amber-50 px-4 py-3 text-base font-semibold text-amber-900 dark:bg-amber-500/10 dark:text-amber-200">
+      {{ ui.ikon('uyari', 'w-5 h-5 mt-0.5 shrink-0') }}
+      <span>Son {{ arama_dakikasi }} dakikada kaydedilmiş bir belge bulunamadı.</span>
+    </p>
+    <p class="mt-2 text-sm text-metin-2">Taramanın bittiğinden emin olup yeniden deneyin. Olmazsa klasörü kendiniz seçin.</p>
+    <div class="mt-4 flex flex-wrap gap-3">
+      <button type="button" class="btn btn-birincil" data-bul-basla>{{ ui.ikon('yenile', 'w-4 h-4') }}Yeniden dene</button>
+      <button type="button" class="btn btn-ikincil" data-gezgin-ac>Klasörü kendim seçeceğim</button>
+    </div>
+  </div>
+
+  {# 6. klasorde dosya var: hepsi mi, bundan sonrakiler mi? #}
+  <div data-adim="soru" hidden>
+    <p class="text-lg font-bold text-metin">Bu klasörde <span data-soru-sayi></span> belge var.</p>
+    <p class="mt-1 break-all text-sm text-metin-3" data-soru-yol></p>
+    <p class="mt-2 text-base text-metin-2">Hepsini arşive ekleyelim mi, yoksa sadece bundan sonrakileri mi?</p>
+    <div class="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
+      <button type="button" class="btn btn-birincil h-12 text-base" data-mevcutlar="hepsi">Hepsini ekle</button>
+      <button type="button" class="btn btn-ikincil h-12 text-base" data-mevcutlar="sonrakiler">Sadece bundan sonrakiler</button>
+    </div>
+  </div>
+
+  <p role="alert" class="mt-4 flex items-start gap-3 rounded-xl bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-800 dark:bg-rose-500/10 dark:text-rose-200" data-klasor-hata hidden>
+    {{ ui.ikon('hata', 'w-5 h-5 shrink-0') }}<span data-klasor-hata-metin></span>
+  </p>
+</section>
+
+<section class="{{ kart }} mt-5 max-w-3xl" style="--i: 3" data-izlenen-klasorler>
+  <h2 class="mb-3 text-base font-bold text-metin">İzlenen klasörler</h2>
+  {% if klasorler %}
+    <ul class="divide-y divide-cizgi">
+      {% for k in klasorler %}
+        <li class="flex items-start gap-3 py-3" data-izlenen-klasor="{{ k.yol }}">
+          <span class="mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full {{ 'bg-emerald-500' if k.izleniyor else 'bg-slate-300 dark:bg-slate-600' }}" aria-hidden="true"></span>
+          <span class="min-w-0 flex-1 text-sm">
+            <span class="block break-all font-medium text-metin">{{ k.yol }}</span>
+            <span class="block text-xs text-metin-3">{{ k.tur }}{% if k.not %} · {{ k.not }}{% endif %}</span>
+          </span>
+          {% if k.kaldirilabilir %}
+            <form action="{{ url_for('klasor_kaldir') }}" method="post" class="shrink-0">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <input type="hidden" name="yol" value="{{ k.yol }}">
+              <button type="submit" class="btn btn-ikincil h-9 px-3 text-xs" data-klasor-kaldir>Kaldır</button>
+            </form>
+          {% endif %}
+        </li>
+      {% endfor %}
+    </ul>
+  {% else %}
+    <p class="text-sm text-metin-2">Henüz izlenen klasör yok.</p>
+  {% endif %}
+</section>
+{% endblock %}
+
+{% block pencereler %}
+{# Klasor gezgini: suruculer ve kisayollar, klasorler, geri; "Bu klasoru sec". #}
+<dialog id="klasor-gezgini" class="pencere" aria-labelledby="gezgin-baslik" data-klasor-gezgini>
+  <div class="flex max-h-[85vh] w-[min(92vw,560px)] flex-col rounded-3xl border border-cizgi bg-kart p-5 shadow-yukselt sm:p-6">
+    <div class="mb-3 flex items-start justify-between gap-4">
+      <h2 id="gezgin-baslik" class="text-lg font-bold tracking-tight text-metin">Klasör seçin</h2>
+      <button type="button" class="ikon-dugmesi -mr-2 -mt-1" data-pencere-kapat aria-label="Kapat">{{ ui.ikon('kapat') }}</button>
+    </div>
+    <div class="mb-3 flex items-center gap-2">
+      <button type="button" class="btn btn-ikincil h-9 shrink-0 px-3" data-gezgin-geri aria-label="Geri">{{ ui.ikon('sol', 'w-4 h-4') }}Geri</button>
+      <p class="min-w-0 truncate text-sm font-medium text-metin-2" data-gezgin-yol>Bu bilgisayar</p>
+    </div>
+    <ul class="min-h-[240px] flex-1 overflow-y-auto rounded-xl border border-cizgi" data-gezgin-liste></ul>
+    <p class="mt-2 text-sm font-medium text-rose-700 dark:text-rose-300" data-gezgin-hata hidden></p>
+    <button type="button" class="btn btn-birincil mt-4 h-12 w-full text-base" data-gezgin-sec disabled>Bu klasörü seç</button>
+  </div>
+</dialog>
+<template id="gezgin-satiri">
+  <li><button type="button" class="flex w-full items-center gap-3 border-b border-cizgi px-4 py-3 text-left text-sm text-metin transition hover:bg-yuzey"
+              data-gezgin-oge><span class="shrink-0 text-metin-3" data-ikon>{{ ui.ikon('klasor', 'w-4 h-4') }}</span><span class="min-w-0 truncate" data-ad></span></button></li>
+</template>
+<template id="bulunan-dosya">
+  <li class="flex flex-col overflow-hidden rounded-xl border border-cizgi bg-kart">
+    <img alt="" class="aspect-[3/4] w-full bg-yuzey object-contain" data-onizleme>
+    <div class="flex flex-1 flex-col gap-1 p-3">
+      <p class="truncate text-sm font-semibold text-metin" data-ad></p>
+      <p class="line-clamp-2 break-all text-xs text-metin-3" data-klasor></p>
+      <button type="button" class="btn btn-birincil mt-auto h-10 w-full" data-bu>{{ ui.ikon('tik', 'w-4 h-4') }}Evet, bu</button>
+    </div>
+  </li>
+</template>
+{% endblock %}
