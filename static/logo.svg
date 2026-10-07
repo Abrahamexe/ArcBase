@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 89 89" width="89" height="89" role="img" aria-label="ArcBase">
+  <!-- ArcBase logosu: arsiv dolabi. Olculer altin orana gore (phi ~ 1,618; Fibonacci 5-8-13-21-34-55-89):
+       kap 89, kose 21; ic alan 55 (89/phi); cekmece 13, aralik 8; etiket 8; tutamak 21 (55/phi^2). -->
+  <defs>
+    <linearGradient id="ab-kap" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#2D6E8E"/><stop offset="1" stop-color="#14304A"/></linearGradient>
+    <linearGradient id="ab-isik" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff" stop-opacity=".22"/><stop offset=".38" stop-color="#fff" stop-opacity="0"/></linearGradient>
+    <linearGradient id="ab-cekmece" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#FFFFFF"/><stop offset="1" stop-color="#DCEBF3"/></linearGradient>
+    <linearGradient id="ab-altin" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#FFD57A"/><stop offset="1" stop-color="#E39B2D"/></linearGradient>
+  </defs>
+  <rect width="89" height="89" rx="21" fill="url(#ab-kap)"/>
+  <rect width="89" height="89" rx="21" fill="url(#ab-isik)"/>
+  <g fill="url(#ab-cekmece)"><rect x="17" y="17" width="55" height="13" rx="3.5"/><rect x="17" y="38" width="55" height="13" rx="3.5"/><rect x="17" y="59" width="55" height="13" rx="3.5"/></g>
+  <g fill="#C9DCE6"><rect x="21" y="20.5" width="8" height="6" rx="1.2"/><rect x="21" y="41.5" width="8" height="6" rx="1.2"/><rect x="21" y="62.5" width="8" height="6" rx="1.2"/></g>
+  <g fill="url(#ab-altin)"><rect x="34" y="21.75" width="21" height="3.5" rx="1.75"/><rect x="34" y="42.75" width="21" height="3.5" rx="1.75"/><rect x="34" y="63.75" width="21" height="3.5" rx="1.75"/></g>
+</svg>

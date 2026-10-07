@@ -10,272 +10,218 @@
 {% import "_bilesenler.html" as ui with context %}
 {% set aktif_endpoint = request.endpoint %}
 {% set secili_tur = aktif_tur if aktif_tur is defined else none %}
-{# Aktif sayfanin menu grubu: bu grup her zaman acik gelir, digerleri hatirlanan durumda. #}
-{% if aktif_endpoint in ('kategori', 'gelen', 'belge') or secili_tur %}{% set aktif_grup = 'arsiv' %}
-{% elif aktif_endpoint in ('klasorler', 'tarama_durumu') %}{% set aktif_grup = 'yonetim' %}
-{% else %}{% set aktif_grup = 'ana' %}{% endif %}
-{% set yonetim_var = klasor_yonetimi_izinli or current_user.yonetici %}
-{% set menu_ikonu = 'w-[18px] h-[18px]' %}
-{# Menu ikon karolari dusuk doygunlukludur (etkiler.css); her ogenin --h tonu vardir,
-   kategorilerinki ui.tur_tonu(kod) ile kategori kartlariyla ayni gelir. #}
-
-{# ================================================================ kenar menu
-   Buzlu cam: yari saydam, bulaniklastirilmis zemin, ince kenarlik ve katmanli
-   derinlik. Ustte logo + calisma alani; "Yeni belge" ve komut paleti (Ctrl+K);
-   yuksekligi animasyonla acilip kapanan gruplar (Ana isler, Arsiv, Yonetim);
-   sayfalar arasinda kayan aktif gosterge; en altta kota ve kullanici karti.
-   Daraltilmis halde ikonlar, rozetler nokta, adlar ipucunda (app.js). #}
+{# Aktif sayfanin menu grubu: grubun hapi koyu dolgulu (aktif) gorunur. #}
+{% set belgeler_aktif = aktif_endpoint in ('kategori', 'gelen', 'belge') or secili_tur %}
+{% set tarama_aktif = aktif_endpoint in ('tara', 'klasorler', 'tarama_durumu') %}
+{% set tarama_var = tarayici_wia or klasor_yonetimi_izinli or current_user.yonetici %}
 {% set kullanilan = [belge_limiti - kalan_kota, 0] | max %}
-<aside id="kenar-menu" aria-label="Ana menü" class="kenar fixed inset-y-0 left-0 z-50 flex flex-col">
-  {# Cok soluk, yavas akan renk isigi (etkiler.css); icerigin arkasinda kalir. #}
-  <div class="aurora" aria-hidden="true"><i></i><i></i><i></i></div>
+{% set rol = 'Yönetici' if current_user.yonetici else 'Kullanıcı' %}
 
-  <div class="kenar-baslik">
-    <a href="{{ url_for('index') }}" class="kenar-marka" data-ipucu="ArcBase" aria-label="ArcBase ana sayfa">
-      <span class="logo-isareti">{{ ui.ikon('arsiv', 'w-[17px] h-[17px]', '2') }}</span>
-      <span class="calisma-alani kenar-etiket">
-        <strong class="wordmark">ArcBase</strong>
-        <small><i aria-hidden="true"></i><span class="truncate">{{ 'Yerel kurulum · Kurum arşivi' if yerel_mod else 'Belge arşivi' }}</span></small>
-      </span>
+{# Menu baglantilari hem ust hap menunun acilir panellerinde hem de mobil menude
+   kullanilir; ayni makro ikisini de cizer (--i: mobil menude sirali giris). #}
+{% macro kategori_baglantilari() -%}
+  <div class="kategori-izgara">
+    {% for kod, bilgi in turler.items() %}
+      <a href="{{ url_for('kategori', tur=kod) }}" class="menu-ogesi" data-tur="{{ kod }}" style="--i: {{ loop.index0 + 2 }}"
+         {% if secili_tur == kod %}aria-current="page"{% endif %}>
+        <span class="menu-ikon">{{ ui.tur_ikonu(kod, 'w-3.5 h-3.5') }}</span>
+        <span class="menu-ad flex-1">{{ bilgi.ad }}</span>
+        <span class="menu-sayac" data-tur-sayaci="{{ kod }}">{{ tur_sayilari[kod].adet }}</span>
+      </a>
+    {% endfor %}
+  </div>
+  {% if gelen_kutusu_var %}
+    {# Yonetici: tarama klasorune sahipsiz dusen belgeler (kullanicilara atanir). #}
+    <div class="acilir-ayirici"></div>
+    <a href="{{ url_for('gelen') }}" class="menu-ogesi" data-gelen-menu style="--i: 9"
+       {% if aktif_endpoint == 'gelen' %}aria-current="page"{% endif %}>
+      <span class="menu-ikon">{{ ui.ikon('gelen') }}</span>
+      <span class="menu-metin"><span class="menu-ad">Gelen belgeler</span><small class="menu-alt">Atanmayı bekleyenler</small></span>
+      {% if gelen_sayisi %}<span class="menu-rozet vurgu">{{ gelen_sayisi }}</span>{% endif %}
     </a>
-    <button type="button" class="ikon-dugmesi ml-auto h-8 w-8 lg:hidden" data-menu-kapat aria-label="Menüyü kapat">
-      {{ ui.ikon('kapat', 'w-[18px] h-[18px]') }}
-    </button>
-  </div>
+  {% endif %}
+{%- endmacro %}
 
-  <div class="kenar-eylemler">
-    <button type="button" data-yukleme-ac data-ipucu="Yeni belge" class="kenar-yeni">
-      {{ ui.ikon('arti', 'w-4 h-4', '2.2') }}<span class="kenar-etiket">Yeni belge</span>
-    </button>
-    <button type="button" data-komut-ac data-ipucu="Ara" data-ipucu-ek="Ctrl K" class="kenar-ara" aria-haspopup="dialog" aria-controls="komut-paleti">
-      {{ ui.ikon('ara', 'w-[15px] h-[15px]') }}<span class="kenar-etiket">Ara…</span><kbd class="kenar-etiket">Ctrl K</kbd>
-    </button>
-  </div>
+{% macro tarama_baglantilari() -%}
+  {% if tarayici_wia %}
+    {# Yalnizca bagli tarayici varken gorunur; app.js tarayici takilip cikarilinca gunceller. #}
+    <a href="{{ url_for('tara') }}" class="menu-ogesi" data-tara-menu style="--i: 10"
+       {% if not bagli_tarayicilar and aktif_endpoint != 'tara' %}hidden{% endif %}
+       {% if aktif_endpoint == 'tara' %}aria-current="page"{% endif %}>
+      <span class="menu-ikon">{{ ui.ikon('tarayici') }}</span>
+      <span class="menu-metin"><span class="menu-ad">Tarayıcıdan tara</span><small class="menu-alt">Bağlı tarayıcıdan belge al</small></span>
+    </a>
+  {% endif %}
+  {% if klasor_yonetimi_izinli %}
+    {# app.py: _klasor_yonetimi_izinli #}
+    <a href="{{ url_for('klasorler') }}" class="menu-ogesi" data-klasorler-menu style="--i: 11"
+       {% if aktif_endpoint == 'klasorler' %}aria-current="page"{% endif %}>
+      <span class="menu-ikon">{{ ui.ikon('klasor') }}</span>
+      <span class="menu-metin"><span class="menu-ad">Tarama klasörleri</span><small class="menu-alt">İzlenen klasörler</small></span>
+    </a>
+  {% endif %}
+  {% if current_user.yonetici %}
+    <a href="{{ url_for('tarama_durumu') }}" class="menu-ogesi" data-tarama-durumu-menu style="--i: 12"
+       {% if aktif_endpoint == 'tarama_durumu' %}aria-current="page"{% endif %}>
+      <span class="menu-ikon">{{ ui.ikon('bilgi') }}</span>
+      <span class="menu-metin"><span class="menu-ad">Tarama durumu</span><small class="menu-alt">Kuyruk ve hatalar</small></span>
+    </a>
+  {% endif %}
+{%- endmacro %}
 
-  <nav class="kenar-nav" aria-label="Menü">
-    <span class="aktif-gosterge" aria-hidden="true" data-aktif-gosterge></span>
+<a href="#icerik" class="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[90] focus:rounded-full focus:bg-kart focus:px-4 focus:py-2 focus:text-sm focus:font-semibold focus:text-metin focus:shadow-yukselt">İçeriğe geç</a>
 
-    {# ---- Ana isler #}
-    <div class="menu-grubu">
-      <button type="button" class="grup-basligi" data-grup-dugmesi="ana" aria-controls="grup-ana"
-              aria-expanded="{{ 'true' if aktif_grup == 'ana' else 'false' }}" {% if aktif_grup == 'ana' %}data-aktif-grup{% endif %}>
-        <span>Ana işler</span>{{ ui.ikon('asagi', 'acilir-ok w-3.5 h-3.5', '2') }}
-      </button>
-      <div id="grup-ana" class="grup-icerik" {% if aktif_grup != 'ana' %}data-kapali{% endif %}>
-        <div class="grup-ic">
-          <a href="{{ url_for('index') }}" class="menu-ogesi" data-ipucu="Panel" style="--h: 245"
-             {% if isleniyor_sayisi %}data-ipucu-ek="{{ isleniyor_sayisi }} işleniyor"{% endif %}
-             {% if aktif_endpoint == 'index' %}aria-current="page"{% endif %}>
-            <span class="menu-ikon">{{ ui.ikon('panel', menu_ikonu) }}<i class="rozet-nokta canli" data-isleniyor-nokta {% if not isleniyor_sayisi %}hidden{% endif %}></i></span>
-            <span class="menu-metin"><span class="kenar-etiket menu-ad">Panel</span><small class="kenar-etiket menu-alt">Özet ve son belgeler</small></span>
-            {# Islenmekte olan belgeler; app.js durum yoklamasiyla gunceller. #}
-            <span class="menu-rozet canli kenar-etiket" data-isleniyor-rozeti title="İşlenen belgeler"
-                  {% if not isleniyor_sayisi %}hidden{% endif %}>{{ isleniyor_sayisi }}</span>
-          </a>
-          <a href="{{ url_for('ara') }}" class="menu-ogesi" data-ipucu="Arama" style="--h: 260; --kroma: .25"
-             {% if aktif_endpoint == 'ara' %}aria-current="page"{% endif %}>
-            <span class="menu-ikon">{{ ui.ikon('ara', menu_ikonu) }}</span>
-            <span class="menu-metin"><span class="kenar-etiket menu-ad">Arama</span><small class="kenar-etiket menu-alt">Tüm belgelerde bul</small></span>
-          </a>
-          {% if tarayici_wia %}
-            {# Yalnizca bagli tarayici varken gorunur; app.js tarayici takilip cikarilinca gunceller. #}
-            <a href="{{ url_for('tara') }}" class="menu-ogesi" data-ipucu="Tarayıcıdan tara" data-tara-menu style="--h: 175"
-               {% if not bagli_tarayicilar and aktif_endpoint != 'tara' %}hidden{% endif %}
-               {% if aktif_endpoint == 'tara' %}aria-current="page"{% endif %}>
-              <span class="menu-ikon">{{ ui.ikon('tarayici', menu_ikonu) }}</span>
-              <span class="menu-metin"><span class="kenar-etiket menu-ad">Tarayıcıdan tara</span><small class="kenar-etiket menu-alt">Tarayıcıdan belge al</small></span>
-            </a>
-          {% endif %}
-        </div>
-      </div>
-    </div>
+{# ================================================================ uygulama kabugu
+   Candy Blue zeminin ustunde yuzen, buyuk koseli panel (style.css .kabuk). Ustte
+   logo, ortada hap menu (aktif sayfa koyu dolgulu hap; sayfalar arasinda kayar),
+   sagda arama (Ctrl K), belge yukleme ve kullanici menusu. #}
+<div class="kabuk">
 
-    {# ---- Arsiv: Kategoriler tek satir; acilinca turler belge sayilariyla #}
-    <div class="menu-grubu">
-      <button type="button" class="grup-basligi" data-grup-dugmesi="arsiv" aria-controls="grup-arsiv"
-              aria-expanded="{{ 'true' if aktif_grup == 'arsiv' else 'false' }}" {% if aktif_grup == 'arsiv' %}data-aktif-grup{% endif %}>
-        <span>Arşiv</span>{{ ui.ikon('asagi', 'acilir-ok w-3.5 h-3.5', '2') }}
-      </button>
-      <div id="grup-arsiv" class="grup-icerik" {% if aktif_grup != 'arsiv' %}data-kapali{% endif %}>
-        <div class="grup-ic">
-          <button type="button" class="menu-ogesi" data-ipucu="Kategoriler" data-grup-dugmesi="kategoriler" data-alt-liste style="--h: 340"
-                  aria-controls="kategori-listesi" aria-expanded="{{ 'true' if secili_tur else 'false' }}"
-                  {% if secili_tur %}data-aktif-grup{% endif %}>
-            <span class="menu-ikon">{{ ui.ikon('etiketler', menu_ikonu) }}</span>
-            <span class="menu-metin"><span class="kenar-etiket menu-ad">Kategoriler</span><small class="kenar-etiket menu-alt">Türe göre ayrılmış</small></span>
-            <span class="kenar-etiket menu-ok">{{ ui.ikon('asagi', 'acilir-ok w-3.5 h-3.5') }}</span>
+  <header class="ust-cubuk">
+   <div class="kap ust-cubuk-ic">
+    <a href="{{ url_for('index') }}" class="marka-baglanti justify-self-start" aria-label="ArcBase ana sayfa">
+      <span class="logo-isareti">{{ ui.logo() }}</span>
+      <span class="wordmark hidden sm:inline">ArcBase</span>
+    </a>
+
+    <nav id="ana-menu" class="ust-nav" aria-label="Ana menü">
+      <div class="nav-haplar" data-nav-haplar>
+        <span class="nav-gosterge" aria-hidden="true" data-aktif-gosterge></span>
+
+        <a href="{{ url_for('index') }}" class="nav-hap" {% if aktif_endpoint == 'index' %}aria-current="page"{% endif %}>
+          <span class="menu-ikon relative">{{ ui.ikon('panel') }}<i class="rozet-nokta" data-isleniyor-nokta {% if not isleniyor_sayisi %}hidden{% endif %}></i></span>
+          <span class="menu-ad">Panel</span>
+          {# Islenmekte olan belgeler; app.js durum yoklamasiyla gunceller. #}
+          <span class="menu-rozet" data-isleniyor-rozeti title="İşlenen belgeler" {% if not isleniyor_sayisi %}hidden{% endif %}>{{ isleniyor_sayisi }}</span>
+        </a>
+
+        <a href="{{ url_for('ara') }}" class="nav-hap" {% if aktif_endpoint == 'ara' %}aria-current="page"{% endif %}>
+          <span class="menu-ikon">{{ ui.ikon('ara') }}</span><span class="menu-ad">Arama</span>
+        </a>
+
+        <div class="nav-oge">
+          <button type="button" class="nav-hap" data-acilir="belgeler" data-belgeler-dugmesi aria-expanded="false" aria-controls="acilir-belgeler"
+                  {% if belgeler_aktif %}data-aktif{% endif %}>
+            <span class="menu-ikon">{{ ui.ikon('arsiv') }}</span><span class="menu-ad">Belgeler</span>{{ ui.ikon('asagi', 'acilir-ok', '2') }}
           </button>
-          {# Agac cizgisi: --n tur sayisi, --dolgu aktif turun cizgi uzunlugundaki payi (yalnizca renkli kisim). #}
-          {% set tur_adedi = turler | length %}
-          {% set aktif_sira = (turler.keys() | list).index(secili_tur) if secili_tur in turler else -1 %}
-          <div id="kategori-listesi" class="grup-icerik alt-liste-sarici" {% if not secili_tur %}data-kapali{% endif %}>
-            <div class="alt-liste" style="--n: {{ tur_adedi }}; --dolgu: {{ '%.4f' | format((aktif_sira + 0.5) / (tur_adedi - 0.5)) if aktif_sira >= 0 else 0 }}; --h: {{ ui.tur_tonu(secili_tur) if secili_tur else 260 }}">
-              {% for kod, bilgi in turler.items() %}
-                <a href="{{ url_for('kategori', tur=kod) }}" class="menu-ogesi" data-ipucu="{{ bilgi.ad }}" data-ipucu-ek="{{ tur_sayilari[kod].adet }}"
-                   data-tur="{{ kod }}" style="--h: {{ ui.tur_tonu(kod) }}; --i: {{ loop.index0 }}{% if kod == 'diger' %}; --kroma: .25{% endif %}"
-                   {% if secili_tur == kod %}aria-current="page"{% endif %}>
-                  <span class="menu-ikon">{{ ui.tur_ikonu(kod, 'w-3.5 h-3.5') }}</span>
-                  <span class="kenar-etiket flex-1">{{ bilgi.ad }}</span>
-                  <span class="menu-sayac kenar-etiket" data-tur-sayaci="{{ kod }}">{{ tur_sayilari[kod].adet }}</span>
-                </a>
-              {% endfor %}
+          <div id="acilir-belgeler" class="acilir-panel" data-acilir-panel>
+            <p class="acilir-baslik">Kategoriler</p>
+            {{ kategori_baglantilari() }}
+          </div>
+        </div>
+
+        {% if tarama_var %}
+          <div class="nav-oge" data-nav-grup>
+            <button type="button" class="nav-hap" data-acilir="tarama" aria-expanded="false" aria-controls="acilir-tarama"
+                    {% if tarama_aktif %}data-aktif{% endif %}>
+              <span class="menu-ikon">{{ ui.ikon('tara') }}</span><span class="menu-ad">Tarama</span>{{ ui.ikon('asagi', 'acilir-ok', '2') }}
+            </button>
+            <div id="acilir-tarama" class="acilir-panel" data-acilir-panel>
+              <p class="acilir-baslik">Tarama</p>
+              {{ tarama_baglantilari() }}
             </div>
           </div>
-          {% if gelen_kutusu_var %}
-            {# Yonetici: tarama klasorune sahipsiz dusen belgeler (kullanicilara atanir). #}
-            <a href="{{ url_for('gelen') }}" class="menu-ogesi" data-ipucu="Gelen belgeler" data-gelen-menu style="--h: 50"
-               {% if gelen_sayisi %}data-ipucu-ek="{{ gelen_sayisi }}"{% endif %}
-               {% if aktif_endpoint == 'gelen' %}aria-current="page"{% endif %}>
-              <span class="menu-ikon">{{ ui.ikon('gelen', menu_ikonu) }}{% if gelen_sayisi %}<i class="rozet-nokta"></i>{% endif %}</span>
-              <span class="menu-metin"><span class="kenar-etiket menu-ad">Gelen belgeler</span><small class="kenar-etiket menu-alt">Atanmayı bekleyenler</small></span>
-              {% if gelen_sayisi %}<span class="menu-rozet vurgu kenar-etiket">{{ gelen_sayisi }}</span>{% endif %}
-            </a>
-          {% endif %}
-        </div>
-      </div>
-    </div>
-
-    {# ---- Yonetim: yalnizca yonetici ya da sunucu bilgisayarinin kendisi #}
-    {% if yonetim_var %}
-      <div class="menu-grubu">
-        <button type="button" class="grup-basligi" data-grup-dugmesi="yonetim" aria-controls="grup-yonetim"
-                aria-expanded="{{ 'true' if aktif_grup == 'yonetim' else 'false' }}" {% if aktif_grup == 'yonetim' %}data-aktif-grup{% endif %}>
-          <span>Yönetim</span>{{ ui.ikon('asagi', 'acilir-ok w-3.5 h-3.5', '2') }}
-        </button>
-        <div id="grup-yonetim" class="grup-icerik" {% if aktif_grup != 'yonetim' %}data-kapali{% endif %}>
-          <div class="grup-ic">
-            {% if klasor_yonetimi_izinli %}
-              {# app.py: _klasor_yonetimi_izinli #}
-              <a href="{{ url_for('klasorler') }}" class="menu-ogesi" data-ipucu="Tarama klasörleri" data-klasorler-menu style="--h: 125"
-                 {% if aktif_endpoint == 'klasorler' %}aria-current="page"{% endif %}>
-                <span class="menu-ikon">{{ ui.ikon('klasor', menu_ikonu) }}</span>
-                <span class="menu-metin"><span class="kenar-etiket menu-ad">Tarama klasörleri</span><small class="kenar-etiket menu-alt">İzlenen klasörler</small></span>
-              </a>
-            {% endif %}
-            {% if current_user.yonetici %}
-              <a href="{{ url_for('tarama_durumu') }}" class="menu-ogesi" data-ipucu="Tarama durumu" data-tarama-durumu-menu style="--h: 195"
-                 {% if aktif_endpoint == 'tarama_durumu' %}aria-current="page"{% endif %}>
-                <span class="menu-ikon">{{ ui.ikon('bilgi', menu_ikonu) }}</span>
-                <span class="menu-metin"><span class="kenar-etiket menu-ad">Tarama durumu</span><small class="kenar-etiket menu-alt">Kuyruk ve hatalar</small></span>
-              </a>
-            {% endif %}
-          </div>
-        </div>
-      </div>
-    {% endif %}
-  </nav>
-
-  {# Hatirlanan grup durumu boyamadan once uygulanir; aktif sayfanin grubu hep acik kalir. #}
-  <script>
-    (function () {
-      var durum = {};
-      try { durum = JSON.parse(localStorage.getItem('menuGruplari') || '{}'); } catch (e) {}
-      document.querySelectorAll('#kenar-menu [data-grup-dugmesi]').forEach(function (d) {
-        var ad = d.getAttribute('data-grup-dugmesi');
-        if (d.hasAttribute('data-aktif-grup') || !(ad in durum)) return;
-        d.setAttribute('aria-expanded', String(!!durum[ad]));
-        document.getElementById(d.getAttribute('aria-controls')).toggleAttribute('data-kapali', !durum[ad]);
-      });
-    })();
-  </script>
-
-  <div class="kenar-alt" data-kullanici-alani>
-    <div class="menu-kota" data-ipucu="Depolama" data-ipucu-ek="{{ kullanilan }} / {{ belge_limiti }}"
-         {% if kota_doldu %}data-dolu{% endif %}>
-      <div class="menu-kota-ust kenar-etiket">
-        <span>{% if yerel_mod %}{{ ui.ikon('kalkan', 'w-3.5 h-3.5') }}{% endif %}Depolama</span>
-        <b>{{ kullanilan }} <small>/ {{ belge_limiti }} belge</small></b>
-      </div>
-      <div class="menu-kota-cubuk" role="progressbar" aria-label="Belge kotası"
-           aria-valuemin="0" aria-valuemax="{{ belge_limiti }}" aria-valuenow="{{ kullanilan }}">
-        <i style="--deger: {{ [(kullanilan / belge_limiti * 100) | round(1), 100] | min if belge_limiti else 0 }}%"></i>
-      </div>
-      <p class="kenar-etiket">{% if kota_doldu %}Kota doldu; eski belgeleri silin{% elif yerel_mod %}Veriler bu kurumda saklanır{% else %}{{ kalan_kota }} belge hakkınız kaldı{% endif %}</p>
-    </div>
-
-    {% set rol = 'Yönetici' if current_user.yonetici else 'Kullanıcı' %}
-    <div id="kullanici-menusu" class="kullanici-menusu" role="menu" data-kullanici-menusu hidden>
-      <div class="kullanici-menusu-baslik">
-        <b>{{ current_user.kullanici_adi }}</b><small>{{ rol }}</small>
-      </div>
-      <a href="{{ url_for('hesap') }}" class="menu-ogesi" role="menuitem"
-         {% if aktif_endpoint == 'hesap' %}aria-current="page"{% endif %}>
-        <span class="menu-ikon">{{ ui.ikon('kullanici', 'w-4 h-4') }}</span>Hesabım
-      </a>
-      <button type="button" class="menu-ogesi" role="menuitem" data-tema-degistir>
-        <span class="menu-ikon"><span class="ikon-gunes">{{ ui.ikon('ay', 'w-4 h-4') }}</span><span class="ikon-ay">{{ ui.ikon('gunes', 'w-4 h-4') }}</span></span>
-        <span class="flex-1"><span class="ikon-gunes">Koyu tema</span><span class="ikon-ay">Açık tema</span></span>
-      </button>
-      <div class="kullanici-menusu-ayirici"></div>
-      <form action="{{ url_for('cikis') }}" method="post">
-        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-        <button type="submit" class="menu-ogesi" role="menuitem">
-          <span class="menu-ikon">{{ ui.ikon('cikis', 'w-4 h-4') }}</span>Çıkış yap
-        </button>
-      </form>
-    </div>
-    <button type="button" class="kullanici-karti" data-kullanici-karti data-ipucu="{{ current_user.kullanici_adi }}" data-ipucu-ek="{{ rol }}"
-            aria-haspopup="menu" aria-expanded="false" aria-controls="kullanici-menusu">
-      <span class="avatar" aria-hidden="true">{{ current_user.kullanici_adi[:2] | upper }}</span>
-      <span class="kenar-etiket kullanici-bilgi">
-        <b>{{ current_user.kullanici_adi }}</b>
-        <small>{{ rol }}</small>
-      </span>
-      <span class="kenar-etiket kullanici-ok">{{ ui.ikon('secici', 'w-[15px] h-[15px]') }}</span>
-    </button>
-  </div>
-</aside>
-
-<div class="menu-perde fixed inset-0 z-40 bg-slate-950/40 lg:hidden" data-menu-kapat></div>
-
-{# ================================================================ icerik #}
-<div class="ana flex min-h-screen flex-col">
-
-  <header class="ust-cubuk sticky top-0 z-30 border-b border-cizgi bg-zemin/90 backdrop-blur">
-    <div class="flex h-14 items-center gap-2 px-4 sm:gap-3 sm:px-6 lg:px-8">
-      <button type="button" class="ikon-dugmesi -ml-2 lg:hidden" data-menu-ac aria-label="Menüyü aç" aria-controls="kenar-menu">
-        {{ ui.ikon('menu', 'w-5 h-5') }}
-      </button>
-      <button type="button" class="ikon-dugmesi -ml-2 hidden lg:inline-flex" data-kenar-daralt aria-label="Menüyü daralt" aria-controls="kenar-menu">
-        {{ ui.ikon('kenar', 'w-[18px] h-[18px]') }}
-      </button>
-
-      <form action="{{ url_for('ara') }}" method="get" role="search" class="relative w-full max-w-md">
-        <label for="ust-arama" class="sr-only">Belgelerde ara</label>
-        <span class="pointer-events-none absolute inset-y-0 left-3 flex items-center text-metin-3">
-          {{ ui.ikon('ara', 'w-4 h-4') }}
-        </span>
-        <input type="search" id="ust-arama" name="q" value="{{ arama_sorgusu }}" autocomplete="off"
-               placeholder="Belgelerde ara…"
-               class="h-9 w-full rounded-md border border-cizgi bg-kart pl-9 pr-10 text-sm text-metin
-                      placeholder:text-metin-3 transition-colors focus:border-marka-500 focus:outline-none focus:ring-2 focus:ring-marka-500/20">
-        <kbd class="pointer-events-none absolute right-2 top-1/2 hidden -translate-y-1/2 rounded border border-cizgi bg-yuzey px-1.5 text-[11px] font-medium leading-5 text-metin-3 sm:block">/</kbd>
-      </form>
-
-      <div class="ml-auto flex items-center gap-2">
-        {% if tarayici_wia %}
-          {# Tarayici bagliyken her sayfada "Tara" (app.js: tarayici algilama). #}
-          <a href="{{ url_for('tara') }}" class="btn btn-birincil" data-tara-dugmesi
-             {% if not bagli_tarayicilar or aktif_endpoint == 'tara' %}hidden{% endif %}>
-            {{ ui.ikon('tarayici', 'w-4 h-4') }}Tara
-          </a>
         {% endif %}
-        <button type="button" class="btn btn-birincil w-9 px-0 lg:hidden" data-yukleme-ac aria-label="Belge yükle">
-          {{ ui.ikon('arti', 'w-4 h-4', '2') }}
-        </button>
       </div>
+    </nav>
+
+    <div class="ust-eylemler">
+      <button type="button" data-komut-ac class="arama-hapi hidden 2xl:inline-flex" aria-haspopup="dialog" aria-controls="komut-paleti">
+        {{ ui.ikon('ara', 'w-4 h-4') }}<span class="pr-3">Ara</span><kbd>Ctrl K</kbd>
+      </button>
+      <button type="button" data-komut-ac class="yuvarlak-dugme 2xl:hidden" aria-label="Ara (Ctrl K)" aria-haspopup="dialog" aria-controls="komut-paleti">
+        {{ ui.ikon('ara', 'w-[18px] h-[18px]') }}
+      </button>
+      {% if tarayici_wia %}
+        {# Tarayici bagliyken her sayfada "Tara" (app.js: tarayici algilama). #}
+        <a href="{{ url_for('tara') }}" class="btn btn-ikincil genis-ekran w-10 px-0 xl:w-auto xl:px-[1.125rem]" data-tara-dugmesi aria-label="Tara"
+           {% if not bagli_tarayicilar or aktif_endpoint == 'tara' %}hidden{% endif %}>
+          {{ ui.ikon('tarayici', 'w-4 h-4') }}<span class="hidden xl:inline">Tara</span>
+        </a>
+      {% endif %}
+      <button type="button" class="btn btn-birincil w-10 px-0 sm:w-auto sm:px-[1.125rem] lg:w-10 lg:px-0 xl:w-auto xl:px-[1.125rem]" data-yukleme-ac aria-label="Belge yükle">
+        {{ ui.ikon('arti', 'w-4 h-4', '2.2') }}<span class="hidden sm:inline lg:hidden xl:inline">Belge yükle</span>
+      </button>
+
+      <div class="kullanici-alani" data-kullanici-alani>
+        <button type="button" class="kullanici-karti" data-kullanici-karti aria-haspopup="menu" aria-expanded="false"
+                aria-controls="kullanici-menusu" aria-label="Hesap menüsü: {{ current_user.kullanici_adi }}">
+          <span class="avatar" aria-hidden="true">{{ current_user.kullanici_adi[:2] | upper }}</span>
+        </button>
+        <div id="kullanici-menusu" class="kullanici-menusu" role="menu" data-kullanici-menusu hidden>
+          <div class="kullanici-menusu-baslik">
+            <span class="avatar" aria-hidden="true">{{ current_user.kullanici_adi[:2] | upper }}</span>
+            <span class="min-w-0"><b class="truncate">{{ current_user.kullanici_adi }}</b><small>{{ rol }}</small></span>
+          </div>
+          <div class="menu-kota" {% if kota_doldu %}data-dolu{% endif %}>
+            <div class="menu-kota-ust">
+              <span>{% if yerel_mod %}{{ ui.ikon('kalkan', 'w-3.5 h-3.5') }}{% endif %}Depolama</span>
+              <b>{{ kullanilan }} <small>/ {{ belge_limiti }} belge</small></b>
+            </div>
+            <div class="menu-kota-cubuk" role="progressbar" aria-label="Belge kotası"
+                 aria-valuemin="0" aria-valuemax="{{ belge_limiti }}" aria-valuenow="{{ kullanilan }}">
+              <i style="--deger: {{ [(kullanilan / belge_limiti * 100) | round(1), 100] | min if belge_limiti else 0 }}%"></i>
+            </div>
+            <p>{% if kota_doldu %}Kota doldu; eski belgeleri silin{% elif yerel_mod %}Veriler bu kurumda saklanır{% else %}{{ kalan_kota }} belge hakkınız kaldı{% endif %}</p>
+          </div>
+          <a href="{{ url_for('hesap') }}" class="menu-ogesi" role="menuitem"
+             {% if aktif_endpoint == 'hesap' %}aria-current="page"{% endif %}>
+            <span class="menu-ikon">{{ ui.ikon('kullanici', 'w-4 h-4') }}</span>Hesabım
+          </a>
+          <button type="button" class="menu-ogesi" role="menuitem" data-tema-degistir>
+            <span class="menu-ikon"><span class="ikon-gunes">{{ ui.ikon('ay', 'w-4 h-4') }}</span><span class="ikon-ay">{{ ui.ikon('gunes', 'w-4 h-4') }}</span></span>
+            <span class="flex-1"><span class="ikon-gunes">Koyu tema</span><span class="ikon-ay">Açık tema</span></span>
+          </button>
+          <div class="kullanici-menusu-ayirici"></div>
+          <form action="{{ url_for('cikis') }}" method="post">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button type="submit" class="menu-ogesi" role="menuitem">
+              <span class="menu-ikon">{{ ui.ikon('cikis', 'w-4 h-4') }}</span>Çıkış yap
+            </button>
+          </form>
+        </div>
+      </div>
+
+      <button type="button" class="yuvarlak-dugme mobil-menu-dugmesi" data-menu-ac aria-label="Menüyü aç" aria-controls="mobil-menu" aria-expanded="false">
+        {{ ui.ikon('menu', 'w-[18px] h-[18px]') }}
+      </button>
     </div>
+   </div>
   </header>
 
-  <main id="icerik" class="sayfa-icerik mx-auto w-full max-w-7xl flex-1 px-4 py-8 sm:px-6 lg:px-8">
+  <main id="icerik" class="sayfa-icerik kap flex-1 pb-16 pt-4 lg:pt-8">
     {% block icerik %}{% endblock %}
   </main>
 
-  <footer class="mx-auto flex w-full max-w-7xl flex-wrap items-center justify-between gap-2 border-t border-cizgi px-4 py-4 text-xs text-metin-3 sm:px-6 lg:px-8" data-alt-bilgi>
+  <footer class="kap flex flex-wrap items-center justify-between gap-2 pb-7 pt-2 text-xs text-metin-3" data-alt-bilgi>
     <span class="flex items-center gap-1.5">{{ ui.ikon('kilit', 'w-3.5 h-3.5') }}Belgeler şifreli saklanır</span>
     <span>ArcBase <span data-surum>{{ surum }}</span></span>
   </footer>
 </div>
+
+{# ================================================================ mobil menu (lg alti)
+   Hap menu yerine ustten acilan panel; ogeler sirayla belirir. #}
+<div class="menu-perde fixed inset-0 z-[65] bg-black/30" data-menu-kapat></div>
+<nav id="mobil-menu" class="mobil-menu" aria-label="Menü">
+  <div class="mb-2 flex items-center justify-between pl-2">
+    <span class="flex items-center gap-2.5"><span class="logo-isareti">{{ ui.logo() }}</span><span class="wordmark">ArcBase</span></span>
+    <button type="button" class="yuvarlak-dugme" data-menu-kapat aria-label="Menüyü kapat">{{ ui.ikon('kapat', 'w-[18px] h-[18px]') }}</button>
+  </div>
+  <a href="{{ url_for('index') }}" class="menu-ogesi" style="--i: 0" {% if aktif_endpoint == 'index' %}aria-current="page"{% endif %}>
+    <span class="menu-ikon">{{ ui.ikon('panel', 'w-4 h-4') }}</span><span class="menu-ad flex-1">Panel</span>
+  </a>
+  <a href="{{ url_for('ara') }}" class="menu-ogesi" style="--i: 1" {% if aktif_endpoint == 'ara' %}aria-current="page"{% endif %}>
+    <span class="menu-ikon">{{ ui.ikon('ara', 'w-4 h-4') }}</span><span class="menu-ad flex-1">Arama</span>
+  </a>
+  <p class="acilir-baslik mt-2">Kategoriler</p>
+  {{ kategori_baglantilari() }}
+  {% if tarama_var %}
+    <div data-nav-grup>
+      <p class="acilir-baslik mt-2">Tarama</p>
+      {{ tarama_baglantilari() }}
+    </div>
+  {% endif %}
+</nav>
 
 {# ================================================================ bildirimler (flash) #}
 {% include "_bildirimler.html" %}

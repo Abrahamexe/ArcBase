@@ -4,147 +4,146 @@
 
 {% block icerik %}
 {% set toplam = tur_sayilari.values() | sum(attribute='adet') %}
-{% set dolu_kategori = tur_sayilari.values() | selectattr('adet') | list | length %}
 {% set en_cok = [tur_sayilari.values() | map(attribute='adet') | max, 1] | max %}
+{% set kullanilan = [belge_limiti - kalan_kota, 0] | max %}
+{% set kota_orani = [kullanilan / belge_limiti, 1] | min if belge_limiti else 0 %}
+{% set hafta_orani = [bu_hafta_yuklenen / toplam, 1] | min if toplam else 0 %}
 
-{# ------------------------------------------------------------ karsilama
-   Yavasca akan gradyan agi; selamlama saate gore app.js/etkiler.js'te degisir
-   (sunucuda "Merhaba"). Yukleme asagidaki Hizli yukleme kartindadir; dugme tekrarlanmaz. #}
-<section class="karsilama bolum-giris" style="--i: 0" aria-label="Karşılama" data-karsilama>
-  <div class="karsilama-ag" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
-  <div class="karsilama-gren" aria-hidden="true"></div>
-  <div class="karsilama-ic">
-    <div class="min-w-0">
-      <p class="karsilama-tarih" data-karsilama-tarih>Panel</p>
-      <h1 class="karsilama-baslik"><span data-selam>Merhaba,</span> <span class="karsilama-ad" data-karsilama-ad>{{ current_user.kullanici_adi }}</span></h1>
-      <p class="karsilama-ozet">
-        <i class="karsilama-nokta" aria-hidden="true"></i>
+{# Panel: referanstaki gibi bento izgara. Sol ustte buyuk vitrin (belge yigini ve
+   depolama kadrani), sagda kategori dagilimi ve iki kucuk gosterge, altta hizli
+   yukleme ve son belgeler. Her gorsel etki tek yerde (etkiler.css). #}
+<div class="pano">
+
+  {# ------------------------------------------------------------ vitrin
+     Selamlama saate gore etkiler.js'te degisir (sunucuda "Merhaba"). Kadran depolama
+     kotasini gosterir; ortasinda belge yigini yavasca suzulur. Yukleme asagidaki
+     Hizli yukleme kartindadir; dugme burada tekrarlanmaz. #}
+  <section class="vitrin bolum-giris" style="--i: 0" aria-label="Karşılama" data-karsilama>
+    <div class="vitrin-metin">
+      <p class="ust-etiket" data-karsilama-tarih>Panel</p>
+      <h1 class="vitrin-baslik"><span data-selam>Merhaba,</span> <span class="vitrin-ad" data-karsilama-ad>{{ current_user.kullanici_adi }}</span></h1>
+      <p class="vitrin-ozet">
         <span>Arşivinizde <b class="font-semibold text-metin">{{ toplam }}</b> belge var.</span>
         <span data-isleniyor-bilgisi {% if not isleniyor_sayisi %}hidden{% endif %} class="inline-flex items-center gap-1.5 font-medium text-marka-700 dark:text-marka-300">
           <span class="donen-halka donen-kucuk" aria-hidden="true"></span><span data-isleniyor-sayisi>{{ isleniyor_sayisi }}</span> belge işleniyor
         </span>
       </p>
     </div>
-  </div>
-</section>
 
-{# ------------------------------------------------------------ istatistikler + hizli yukleme #}
-<section class="panel-ust" aria-label="Özet ve hızlı yükleme">
-  <div class="panel-sayilar">
-    <div class="renkli-kart ton-buz bolum-giris rounded-2xl border p-5 shadow-kart" style="--i: 1">
-      <div class="flex items-start justify-between">
-        <p class="text-sm font-semibold text-metin-2">Toplam belge</p>
-        <span class="flex h-8 w-8 border border-cizgi bg-yuzey/60 text-metin-2 items-center justify-center rounded-xl">
-          {{ ui.ikon('arsiv') }}
-        </span>
-      </div>
-      <p class="sayi-gecis mt-1 text-4xl font-semibold tracking-tight text-metin" data-sayac="{{ toplam }}">{{ toplam }}</p>
-      <p class="mt-1 text-xs text-metin-3">{{ dolu_kategori }} / {{ turler | length }} kategoride belge var</p>
+    {% call ui.belge_sahnesi(kota_orani) %}
+      <b data-sayac="{{ kullanilan }}">{{ kullanilan }}</b>
+      <small>/ {{ belge_limiti }} belge</small>
+    {% endcall %}
+
+    <div class="vitrin-alt">
+      <dl class="vitrin-sayilar">
+        <div><dt>Toplam belge</dt><dd>{{ toplam }}</dd></div>
+        <div><dt>Dolu kategori</dt><dd>{{ tur_sayilari.values() | selectattr('adet') | list | length }}<small>/{{ turler | length }}</small></dd></div>
+        <div><dt>Kalan hak</dt><dd>{{ kalan_kota }}</dd></div>
+      </dl>
+      <p class="vitrin-not">
+        <span class="vitrin-nokta" aria-hidden="true"></span>
+        {% if kota_doldu %}Depolama doldu; yeni belge için eski belgeleri silin{% else %}Depolamanın %{{ (kota_orani * 100) | round(1) | replace('.0', '') }}'i kullanılıyor{% endif %}
+      </p>
     </div>
+  </section>
 
-    {# Menu sayaclariyla ayni sorguda hesaplanir (Turkiye saatiyle Pazartesi 00:00'dan beri). #}
-    <div class="renkli-kart ton-gunes bolum-giris rounded-2xl border p-5 shadow-kart" style="--i: 2">
-      <div class="flex items-start justify-between">
-        <p class="text-sm font-semibold text-metin-2">Bu hafta yüklenen</p>
-        <span class="flex h-8 w-8 border border-cizgi bg-yuzey/60 text-metin-2 items-center justify-center rounded-xl">
-          {{ ui.ikon('artis') }}
-        </span>
-      </div>
-      <p class="sayi-gecis mt-1 text-4xl font-semibold tracking-tight text-metin" data-sayac="{{ bu_hafta_yuklenen }}">{{ bu_hafta_yuklenen }}</p>
-      <p class="mt-1 text-xs text-metin-3">Pazartesiden bu yana</p>
+  {# ------------------------------------------------------------ kategori dagilimi
+     Her kategori bir cubuk: ince iz ve uzerinde amber dolgu (en cok belgeli = tam boy). #}
+  <section class="pano-kart grafik-karti bolum-giris" style="--i: 1" aria-labelledby="dagilim-baslik">
+    <div class="pano-kart-ust">
+      <h2 id="dagilim-baslik" class="pano-baslik">Kategori dağılımı</h2>
+      <a href="{{ url_for('ara') }}" class="ok-kaynak" aria-label="Tüm belgelerde ara"><span class="ok-dugmesi">{{ ui.ikon('ok-sag-ust') }}</span></a>
     </div>
-
-    {# Tarayici durumu: sayfa acilirken bilinen tarayicilar (onbellek); app.js birkac saniyede bir gunceller. #}
-    {% set tarayici_sayisi = bagli_tarayicilar | length %}
-    {% set tarayici_durumu = 'kapali' if not tarayici_wia else ('bagli' if tarayici_sayisi else 'yok') %}
-    <div class="renkli-kart ton-nane tarayici-karti bolum-giris rounded-2xl border p-5 shadow-kart" style="--i: 3" data-tarayici-karti data-durum="{{ tarayici_durumu }}">
-      <div class="flex items-start justify-between">
-        <p class="text-sm font-semibold text-metin-2">Tarayıcı</p>
-        <span class="flex h-8 w-8 border border-cizgi bg-yuzey/60 text-metin-2 items-center justify-center rounded-xl">
-          {{ ui.ikon('tarayici') }}
-        </span>
-      </div>
-      <p class="tarayici-ozet mt-1"><i class="tarayici-nokta" aria-hidden="true"></i><span data-tarayici-ozet>{% if tarayici_durumu == 'kapali' %}Kapalı{% elif tarayici_sayisi > 1 %}{{ tarayici_sayisi }} tarayıcı bağlı{% elif tarayici_sayisi %}Bağlı{% else %}Bağlı değil{% endif %}</span></p>
-      <p class="mt-1 truncate text-xs text-metin-3" data-tarayici-ad>{% if tarayici_durumu == 'kapali' %}Bu bilgisayarda doğrudan tarama kullanılamıyor{% elif tarayici_sayisi %}{{ bagli_tarayicilar | map(attribute='ad') | join(', ') }}{% else %}Tarayıcıyı bilgisayara bağlayıp açın{% endif %}</p>
-      {% if tarayici_wia %}
-        <a href="{{ url_for('tara') }}" class="tarayici-tara mt-3 inline-flex items-center gap-1 text-xs font-semibold text-marka-700 hover:underline dark:text-marka-300" data-tarayici-tara {% if not tarayici_sayisi %}hidden{% endif %}>Tara{{ ui.ikon('sag', 'w-3.5 h-3.5') }}</a>
-      {% endif %}
+    <div class="cubuk-grafik">
+      {% for kod, ozet in tur_sayilari.items() %}
+        <a href="{{ url_for('kategori', tur=kod) }}" class="cubuk-sutun" style="--i: {{ loop.index0 }}"
+           title="{{ turler[kod].ad }}: {{ ozet.adet }} belge">
+          <span class="cubuk-sayi">{{ ozet.adet }}</span>
+          <span class="cubuk-iz"><i style="--oran: {{ '%.3f' | format(ozet.adet / en_cok) }}"></i></span>
+          <span class="cubuk-ikon">{{ ui.tur_ikonu(kod, 'w-4 h-4') }}</span>
+          <span class="cubuk-ad">{{ turler[kod].ad }}</span>
+        </a>
+      {% endfor %}
     </div>
-  </div>
+  </section>
 
-  {# Ana eylem karti: kenarinda ince bir isik dolasir (yalnizca burada). #}
-  <div class="kenar-isini bolum-giris" style="--i: 3">
-    <div class="kenar-isini-ic">
-      <h2 id="yukleme-bolumu" class="mb-4 text-base font-bold text-metin">Hızlı yükleme</h2>
-      {{ ui.yukleme_formu(buyuk=true) }}
+  {# ------------------------------------------------------------ bu hafta (yarim kadran)
+     Menu sayaclariyla ayni sorguda hesaplanir (Turkiye saatiyle Pazartesi 00:00'dan beri). #}
+  <section class="pano-kart hafta-karti bolum-giris" style="--i: 2" aria-labelledby="hafta-baslik">
+    <h2 id="hafta-baslik" class="pano-baslik">Bu hafta yüklenen</h2>
+    <p class="buyuk-sayi"><b class="sayi-gecis" data-sayac="{{ bu_hafta_yuklenen }}">{{ bu_hafta_yuklenen }}</b><small>belge</small></p>
+    <svg class="yay" viewBox="0 0 200 104" aria-hidden="true" style="--uzunluk: {{ '%.2f' | format(hafta_orani * 50) }}">
+      <path class="yay-iz" d="M12 100a88 88 0 0 1 176 0" pathLength="50"/>
+      <path class="yay-deger" d="M12 100a88 88 0 0 1 176 0" pathLength="50"/>
+    </svg>
+    <p class="pano-not">Arşivin %{{ (hafta_orani * 100) | round | int }}'i · Pazartesiden bu yana</p>
+  </section>
+
+  {# ------------------------------------------------------------ tarayici (radar)
+     Sayfa acilirken bilinen tarayicilar (onbellek); app.js birkac saniyede bir gunceller.
+     Bagliyken radarin isini yavasca doner. #}
+  {% set tarayici_sayisi = bagli_tarayicilar | length %}
+  {% set tarayici_durumu = 'kapali' if not tarayici_wia else ('bagli' if tarayici_sayisi else 'yok') %}
+  <section class="pano-kart tarayici-karti bolum-giris" style="--i: 3" data-tarayici-karti data-durum="{{ tarayici_durumu }}" aria-labelledby="tarayici-baslik">
+    <h2 id="tarayici-baslik" class="pano-baslik">Tarayıcı</h2>
+    <div class="radar" aria-hidden="true"><i></i><i></i><i></i><span class="radar-isin"></span><span class="tarayici-nokta"></span></div>
+    <p class="tarayici-ozet" data-tarayici-ozet>{% if tarayici_durumu == 'kapali' %}Kapalı{% elif tarayici_sayisi > 1 %}{{ tarayici_sayisi }} tarayıcı bağlı{% elif tarayici_sayisi %}Bağlı{% else %}Bağlı değil{% endif %}</p>
+    <p class="pano-not truncate" data-tarayici-ad>{% if tarayici_durumu == 'kapali' %}Bu bilgisayarda doğrudan tarama kullanılamıyor{% elif tarayici_sayisi %}{{ bagli_tarayicilar | map(attribute='ad') | join(', ') }}{% else %}Tarayıcıyı bilgisayara bağlayıp açın{% endif %}</p>
+    {% if tarayici_wia %}
+      <a href="{{ url_for('tara') }}" class="tarayici-tara mt-2 inline-flex items-center gap-1 text-xs font-semibold text-marka-700 hover:underline dark:text-marka-300" data-tarayici-tara {% if not tarayici_sayisi %}hidden{% endif %}>Tara{{ ui.ikon('sag', 'w-3.5 h-3.5') }}</a>
+    {% endif %}
+  </section>
+
+  {# ------------------------------------------------------------ hizli yukleme (ana eylem) #}
+  <section class="pano-kart yukleme-karti bolum-giris" style="--i: 4" aria-labelledby="yukleme-bolumu">
+    <div class="pano-kart-ust">
+      <h2 id="yukleme-bolumu" class="pano-baslik">Hızlı yükleme</h2>
+      <span class="pano-not">JPG, PNG, PDF</span>
     </div>
-  </div>
-</section>
+    {{ ui.yukleme_formu(buyuk=true) }}
+  </section>
 
-{# ------------------------------------------------------------ kategoriler (spotlight) #}
-<section class="mt-10 bolum-giris" style="--i: 4" aria-labelledby="kategori-bolumu">
-  <div class="mb-4">
-    <h2 id="kategori-bolumu" class="text-lg font-bold tracking-tight text-metin">Kategoriler</h2>
-    <p class="text-sm text-metin-2">Belgeler türüne göre kendiliğinden ayrılır · kategoriye tıklayarak açın</p>
-  </div>
-  <div class="spot-alani" data-spot-alani>
-    {% for kod, ozet in tur_sayilari.items() | sort(attribute='1.adet', reverse=true) %}
-      {% set yuzde = ((ozet.adet / toplam * 100) | round | int) if toplam else 0 %}
-      <a href="{{ url_for('kategori', tur=kod) }}" class="spot-kart" data-spot-kart style="--h: {{ ui.tur_tonu(kod) }}; --i: {{ loop.index0 }}"
-         title="{{ turler[kod].ad }}: {{ ozet.adet }} belge{% if toplam %} (%{{ yuzde }}){% endif %}">
-        <span class="spot-isik" aria-hidden="true"><i></i></span><span class="spot-halka" aria-hidden="true"><i></i></span>
-        <span class="spot-ust">
-          <span class="spot-karo">{{ ui.tur_ikonu(kod, 'w-[18px] h-[18px]') }}</span>
-          <span class="spot-tarih">{% if ozet.son_tarih %}son yükleme {{ ui.zaman(ozet.son_tarih) }}{% else %}henüz belge yok{% endif %}</span>
-        </span>
-        <span class="spot-alt">
-          <span class="spot-ad">{{ turler[kod].ad }}</span>
-          <span class="spot-sayi"><b class="tabular-nums">{{ ozet.adet }}</b><small>belge{% if toplam and ozet.adet %} · %{{ yuzde }}{% endif %}</small></span>
-          <span class="spot-cubuk" aria-hidden="true"><i style="--oran: {{ (ozet.adet / en_cok) | round(3) }}; --i: {{ loop.index0 }}"></i></span>
-        </span>
-      </a>
-    {% endfor %}
-  </div>
-</section>
+  {# ------------------------------------------------------------ nasil calisir #}
+  <section class="pano-kart adim-karti bolum-giris" style="--i: 5" aria-labelledby="nasil-bolumu">
+    <h2 id="nasil-bolumu" class="pano-baslik">Nasıl çalışır?</h2>
+    <ol class="adimlar">
+      {% set adimlar = [
+        ('gorsel', 'Fotoğrafla', 'Belgenin fotoğrafını çekin ya da PDF’ini hazırlayın.'),
+        ('yukle', 'Yükle', 'Sürükleyip bırakın; birden fazla belge olur.'),
+        ('arsiv', 'Düzenli arşivin hazır', 'Türüne göre ayrılır, bilgileri doldurulur, kolayca bulunur.'),
+      ] %}
+      {% for ikon_adi, baslik_adi, aciklama in adimlar %}
+        <li>
+          <span class="adim-no">{{ '%02d' | format(loop.index) }}</span>
+          <div>
+            <p class="text-sm font-semibold text-metin">{{ baslik_adi }}</p>
+            <p class="mt-0.5 text-xs leading-relaxed text-metin-2">{{ aciklama }}</p>
+          </div>
+          <span class="adim-ikon">{{ ui.ikon(ikon_adi, 'w-[18px] h-[18px]') }}</span>
+        </li>
+      {% endfor %}
+    </ol>
+  </section>
+</div>
 
 {# ------------------------------------------------------------ son yuklenenler #}
-<section class="mt-10 bolum-giris" style="--i: 5" aria-labelledby="son-bolumu">
-  <div class="mb-4 flex flex-wrap items-end justify-between gap-3">
+<section class="mt-16 bolum-giris" style="--i: 6" aria-labelledby="son-bolumu">
+  <div class="mb-5 flex flex-wrap items-end justify-between gap-3">
     <div>
-      <h2 id="son-bolumu" class="text-lg font-bold tracking-tight text-metin">Son yüklenenler</h2>
-      <p class="text-sm text-metin-2">Arşive en son eklenen belgeler</p>
+      <p class="ust-etiket">Arşiv</p>
+      <h2 id="son-bolumu" class="text-2xl font-semibold tracking-tight text-metin">Son yüklenenler</h2>
     </div>
-    {% if son_belgeler %}{{ ui.excel_dugmesi({}, 'h-9 px-3 text-xs') }}{% endif %}
+    {% if son_belgeler %}{{ ui.excel_dugmesi({}, 'h-9 px-4 text-xs') }}{% endif %}
   </div>
 
   {% if son_belgeler %}
-    <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+    <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
       {% for b in son_belgeler %}{{ ui.belge_karti(b, loop.index0 + 6) }}{% endfor %}
     </div>
   {% else %}
-    {{ ui.bos_durum('kutu', 'Arşiviniz ilk belgesini bekliyor', 'Yukarıdaki alana bir fotoğraf bırakın, gerisini biz halledelim. İlk adım en kolayı!', ton='ton-gunes') }}
+    {{ ui.bos_durum('kutu', 'Arşiviniz ilk belgesini bekliyor', 'Yukarıdaki alana bir fotoğraf bırakın, gerisini biz halledelim.', ton='ton-gunes') }}
   {% endif %}
-</section>
-
-{# ------------------------------------------------------------ nasil calisir #}
-<section class="mt-10 bolum-giris" style="--i: 6" aria-labelledby="nasil-bolumu">
-  <h2 id="nasil-bolumu" class="mb-4 text-base font-bold text-metin">Nasıl çalışır?</h2>
-  <ol class="nasil-adimlar">
-    {% set adimlar = [
-      ('gorsel', 'Fotoğrafla', 'Belgenin fotoğrafını çekin ya da PDF’ini hazırlayın.', 'ton-buz'),
-      ('yukle', 'Yükle', 'Sürükleyip bırakın; birden fazla belge olur.', 'ton-gunes'),
-      ('arsiv', 'Düzenli arşivin hazır', 'Türüne göre ayrılır, bilgileri doldurulur, kolayca bulunur.', 'ton-nane'),
-    ] %}
-    {% for ikon_adi, baslik_adi, aciklama, ton in adimlar %}
-      <li class="flex gap-3">
-        <span class="renkli-ikon {{ ton }} flex h-9 w-9 shrink-0 items-center justify-center rounded-xl">{{ ui.ikon(ikon_adi, 'w-[18px] h-[18px]') }}</span>
-        <div>
-          <p class="text-sm font-semibold text-metin">{{ baslik_adi }}</p>
-          <p class="text-xs leading-relaxed text-metin-2">{{ aciklama }}</p>
-        </div>
-      </li>
-    {% endfor %}
-  </ol>
 </section>
 
 {% endblock %}

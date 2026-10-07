@@ -252,8 +252,8 @@ def test_derlenmis_tailwind_ve_uzun_statik_onbellek(girisli):
 def test_arayuz_animasyonlari_300_800ms():
     """Tasarim kurali: ana animasyon ve gecisler 300-800 ms (gecikmeler dahil her deger en
     fazla 800 ms); yumusak cikis egrisi; kartlar ve bolumler sirayla gelir. Mikro gecisler
-    (hover rengi, ipucu) 300 ms'nin altinda kalabilir. Surekli akan arka plan isiklari
-    (aurora, karsilama agi, kenar isini) ve donen gostergeler (iskelet, nabiz) haric tutulur;
+    (hover rengi, acilir panel) 300 ms'nin altinda kalabilir. Surekli ve cok yavas hareketler
+    (belge yigini, radar, tarama isigi) ve donen gostergeler (iskelet, nabiz) haric tutulur;
     onlar ambiyanstir ve prefers-reduced-motion'da kapatilir."""
     css = (KOK / "static" / "style.css").read_text(encoding="utf-8") + "\n" + (KOK / "static" / "etkiler.css").read_text(encoding="utf-8")
 
@@ -264,24 +264,24 @@ def test_arayuz_animasyonlari_300_800ms():
 
     # Her deger en fazla 800 ms.
     for secici in ("::view-transition-old(icerik)", ".sayfa-icerik { animation", ".kart-giris {", ".guven-dolgu", ".kota-dolgu",
-                   ".bildirim {", "dialog.pencere[open] > *", ".kullanici-menusu {\n", ".aktif-gosterge {", ".grup-icerik {",
-                   ".bolum-giris {", ".spot-kart {", ".spot-cubuk i {", ".alt-liste::after {\n  background", ".ocr-kutu.ocr-oynat .ocr-satir",
-                   ".tarama-netles", "::view-transition-group(belge-gorsel)", ".karo-vurgu",
+                   ".bildirim {", "dialog.pencere[open] > *", ".kullanici-menusu {\n", ".nav-gosterge {", ".acilir-panel {",
+                   ".mobil-menu {", ".bolum-giris {", ".kadran-deger {\n", ".kadran-ibre {", ".cubuk-iz i {\n", ".yay-deger { stroke",
+                   ".ocr-kutu.ocr-oynat .ocr-satir", ".tarama-netles", "::view-transition-group(belge-gorsel)", ".karo-vurgu",
                    "html.tema-gecisi::view-transition-new(root) {\n  animation: tema-sil"):
         assert sureler(secici) and max(sureler(secici)) <= 800, secici
     # Ana animasyonlar 300 ms'den kisa olmaz.
-    for secici in (".sayfa-icerik { animation", ".kart-giris {", ".aktif-gosterge {", ".grup-icerik {", ".bolum-giris {",
-                   ".spot-cubuk i {", ".alt-liste::after {\n  background", ".ocr-kutu.ocr-oynat .ocr-satir", "::view-transition-group(belge-gorsel)",
+    for secici in (".sayfa-icerik { animation", ".kart-giris {", ".nav-gosterge {", ".bolum-giris {", ".kadran-deger {\n",
+                   ".cubuk-iz i {\n", ".yay-deger { stroke", ".ocr-kutu.ocr-oynat .ocr-satir", "::view-transition-group(belge-gorsel)",
                    "html.tema-gecisi::view-transition-new(root) {\n  animation: tema-sil"):
         assert max(sureler(secici)) >= 300, secici
     kart = css[css.index(".kart-giris {"):]
     assert "animation: icerik-gir" in kart[:kart.index("}")] and "var(--i" in kart[:kart.index("}")]
     bolum = css[css.index(".bolum-giris {"):]
     assert "animation: bolum-gir" in bolum[:bolum.index("}")] and "var(--i" in bolum[:bolum.index("}")]
-    assert "--yumusak: cubic-bezier(0.22, 1, 0.36, 1)" in css
-    # Surekli akan isiklar hareket azaltmada durur.
+    assert "--yumusak: cubic-bezier(0.23, 1, 0.32, 1)" in css
+    # Surekli hareketler (yigin, radar) ve panel girisleri hareket azaltmada durur.
     azalt = css[css.rindex("prefers-reduced-motion: reduce"):]
-    assert ".aurora i" in azalt and ".karsilama-ag i" in azalt and ".kenar-isini::before" in azalt
+    assert ".yaprak" in azalt and ".radar-isin" in azalt and ".kadran-deger" in azalt and ".cubuk-iz i" in azalt
 
 
 def test_etkiler_yalnizca_gorunum_ve_dis_adres_yok():
@@ -302,6 +302,6 @@ def test_etkiler_yalnizca_gorunum_ve_dis_adres_yok():
             if derinlik == 0:
                 return css[i:j + 1]
 
-    for ad in ("bolum-gir", "agac-dol", "tarama-gecis", "netles", "rozet-otur", "ocr-belir", "cubuk-buyu", "kenar-isini",
-               "aurora-1", "ag-1"):
+    for ad in ("bolum-gir", "kadran-ciz", "ibre-don", "yaprak-suzul", "yay-ciz", "radar-don", "tarama-gecis", "netles",
+               "rozet-otur", "ocr-belir", "cubuk-buyu"):
         assert not re.search(r"(?<![-\w])(width|height|top|left|margin)\s*:", govde(ad)), ad

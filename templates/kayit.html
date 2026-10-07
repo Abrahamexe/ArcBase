@@ -3,36 +3,26 @@
 {% block baslik %}Kayıt ol — ArcBase{% endblock %}
 
 {% block icerik %}
-<div class="flex flex-1 items-center justify-center">
-  <section class="kart-giris w-full max-w-md" style="--i: 0" aria-labelledby="kayit-baslik">
-    <div class="rounded-3xl border border-cizgi bg-kart p-6 shadow-yukselt sm:p-8">
-      <span class="mb-5 flex h-12 w-12 items-center justify-center rounded-2xl bg-teal-50 text-turkuaz-600 dark:bg-turkuaz-500/15 dark:text-turkuaz-400">
-        {{ ui.ikon('kullanici', 'w-6 h-6') }}
-      </span>
-      <h1 id="kayit-baslik" class="text-2xl font-semibold tracking-tight text-metin">Hesap oluşturun</h1>
-      <p class="mt-1 text-sm text-metin-2">Belgeleriniz yalnızca size ait olur; başka kimse göremez.</p>
+{% call ui.kimlik_duzeni('Kayıt', 'Hesap oluşturun', 'Belgeleriniz yalnızca size ait olur; başka kimse göremez.', 'kayit-baslik') %}
+  <form action="{{ url_for('kayit') }}" method="post" class="mt-8 space-y-5" data-kimlik-formu>
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    {{ ui.form_hatasi(hata) }}
+    {{ ui.form_alani('kullanici_adi', 'Kullanıcı adı', deger=form.get('kullanici_adi', ''), ikon_adi='kullanici',
+                     otomatik='username', ipucu='3-30 karakter; harf, rakam ve alt çizgi (_).',
+                     ekstra='required autofocus minlength="3" maxlength="30" pattern="[A-Za-z0-9_]+" autocapitalize="none" spellcheck="false"') }}
+    {{ ui.form_alani('sifre', 'Şifre', tur='password', ikon_adi='kilit', otomatik='new-password',
+                     ipucu='En az 8 karakter.', ekstra='required minlength="8" maxlength="128"') }}
+    {{ ui.form_alani('sifre_tekrar', 'Şifre (tekrar)', tur='password', ikon_adi='kilit', otomatik='new-password',
+                     ekstra='required minlength="8" maxlength="128"') }}
 
-      <form action="{{ url_for('kayit') }}" method="post" class="mt-6 space-y-4" data-kimlik-formu>
-        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-        {{ ui.form_hatasi(hata) }}
-        {{ ui.form_alani('kullanici_adi', 'Kullanıcı adı', deger=form.get('kullanici_adi', ''), ikon_adi='kullanici',
-                         otomatik='username', ipucu='3-30 karakter; harf, rakam ve alt çizgi (_).',
-                         ekstra='required autofocus minlength="3" maxlength="30" pattern="[A-Za-z0-9_]+" autocapitalize="none" spellcheck="false"') }}
-        {{ ui.form_alani('sifre', 'Şifre', tur='password', ikon_adi='kilit', otomatik='new-password',
-                         ipucu='En az 8 karakter.', ekstra='required minlength="8" maxlength="128"') }}
-        {{ ui.form_alani('sifre_tekrar', 'Şifre (tekrar)', tur='password', ikon_adi='kilit', otomatik='new-password',
-                         ekstra='required minlength="8" maxlength="128"') }}
+    <button type="submit" class="btn btn-birincil h-12 w-full text-sm" data-mesgul-sifirla>
+      Kayıt ol{{ ui.ikon('sag', 'w-4 h-4', '2') }}
+    </button>
+  </form>
 
-        <button type="submit" class="btn btn-birincil w-full" data-mesgul-sifirla>
-          {{ ui.ikon('tik', 'w-4 h-4', '2.4') }}Kayıt ol
-        </button>
-      </form>
-
-      <p class="mt-6 border-t border-cizgi pt-5 text-center text-sm text-metin-2">
-        Zaten hesabınız var mı?
-        <a href="{{ url_for('giris') }}" class="font-semibold text-marka-600 hover:underline dark:text-marka-300">Giriş yapın</a>
-      </p>
-    </div>
-  </section>
-</div>
+  <p class="mt-8 text-center text-sm text-metin-2">
+    Zaten hesabınız var mı?
+    <a href="{{ url_for('giris') }}" class="font-semibold text-marka-700 underline-offset-4 hover:underline dark:text-marka-300">Giriş yapın</a>
+  </p>
+{% endcall %}
 {% endblock %}

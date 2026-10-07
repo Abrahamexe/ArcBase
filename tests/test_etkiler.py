@@ -1,6 +1,6 @@
-"""Gorsel etkiler (docs/vitrin): sablonlarin yeni yapisi. Hangi etki nerede: her biri tek yerde
-kullanilir (spotlight yalniz Kategoriler izgarasinda, kenar isini yalniz hizli yukleme kartinda,
-miknatis yalniz Panel'in ana dugmesinde...). Tarayici davranisi test_arayuz.py'de (yavas)."""
+"""Gorsel etkiler ve yeni arayuz yapisi (ust hap menu, Panel bento izgarasi). Her etki tek yerde
+kullanilir (kadran ve belge yigini yalniz vitrinde, cubuklar yalniz kategori dagiliminda, radar
+yalniz tarayici kartinda...). Tarayici davranisi test_arayuz.py'de (yavas)."""
 
 import re
 
@@ -28,52 +28,56 @@ def test_panel_etkileri_tek_yerde(girisli):
     for tur in ("fatura", "fatura", "kimlik"):
         belge_ekle(k["id"], tur=tur)
     html = _panel(c)
-    # 13 karsilama: sunucu yedek selamlamayi kullanici adiyla yazar; ana eylem dugmesi tek ve miknatisli (15)
+    # karsilama (vitrin): sunucu yedek selamlamayi kullanici adiyla yazar
     assert html.count("data-karsilama>") == 1
-    # yukleme yalnizca asagidaki Hizli yukleme kartinda: karsilamada dugme tekrarlanmaz
+    # yukleme yalnizca asagidaki Hizli yukleme kartinda: vitrinde dugme tekrarlanmaz
     bas = html.index("data-karsilama>")
-    karsilama = html[bas:html.index("</section>", bas)]
-    assert "<button" not in karsilama and "data-yukleme-ac" not in karsilama
+    vitrin = html[bas:html.index("</section>", bas)]
+    assert "<button" not in vitrin and "data-yukleme-ac" not in vitrin
     assert 'data-selam>Merhaba,' in html and k["ad"] in html
-    # istatistik kutulari alt alta uc tane: toplam, haftalik, tarayici durumu
+    # vitrinde depolama kadrani ve belge yigini; kadran ve yigin yalniz burada
+    assert vitrin.count('class="kadran"') == 1 and vitrin.count('class="yigin"') == 1
+    assert html.count('class="kadran"') == 1 and html.count('class="yigin"') == 1
+    # kategori dagilimi: her tur icin bir cubuk, oranla dolar; yalniz bir grafik
+    assert html.count('class="cubuk-sutun"') == 6 and html.count('class="cubuk-grafik"') == 1
+    assert len(re.findall(r'class="cubuk-iz"><i style="--oran: [\d.]+"', html)) == 6
+    # yay yalniz "Bu hafta", radar yalniz tarayici kartinda
+    assert html.count('class="yay"') == 1 and html.count('class="radar"') == 1
     assert html.count("data-tarayici-karti") == 1
-    assert len(re.findall(r'class="renkli-kart [^"]*bolum-giris', html)) == 3
-    # 6 spotlight: her tur icin bir kart, hepsi Kategoriler izgarasinda
-    assert html.count("data-spot-kart") == 6 and html.count("data-spot-alani") == 1
-    # 7 kenar isini yalniz hizli yukleme kartinda
-    assert len(re.findall(r'class="kenar-isini[ "]', html)) == 1
-    assert re.search(r'class="kenar-isini[^"]*"[^>]*>\s*<div class="kenar-isini-ic">\s*<h2[^>]*>Hızlı yükleme', html)
-    # 12 sayaclar: toplam ve haftalik; kategori kartlarinda dagilim cubugu oranla dolar
+    # hizli yukleme karti formu tasir (test_arayuz.py "main [data-yukleme-formu]")
+    assert re.search(r'<h2 id="yukleme-bolumu"[^>]*>Hızlı yükleme</h2>', html)
+    # sayaclar: kadran (kullanilan) ve haftalik
     assert html.count("data-sayac=") == 2
-    assert html.count('class="spot-cubuk"') == 6
-    # 11 sayfa bolumleri bulanik girer
+    # sayfa bolumleri bulanik girer
     assert html.count("bolum-giris") >= 6
 
 
-def test_menu_renkli_karolar_ve_aciklamalar(girisli):
+def test_ust_hap_menu(girisli):
     c, _ = girisli
     html = _panel(c)
-    menu = html[html.index('id="kenar-menu"'):html.index("</aside>")]
-    # 5 aurora + 1 renk tonu her ogede + 4 aciklama satirlari
-    assert 'class="aurora"' in menu
-    tonlar = re.findall(r'class="menu-ogesi"[^>]*style="--h: (\d+)', menu)
-    assert len(tonlar) >= 4 and len(set(tonlar)) >= len(tonlar) - 1  # her ogenin kendi rengi (Arama ve Diger ayni notr ton)
-    assert menu.count("menu-alt") >= 4 and "Özet ve son belgeler" in menu
-    # Kategori alt ogeleri: tur ikonu + kendi tonu + sira (asamali beliris icin)
-    assert len(re.findall(r'data-tur="[a-z_]+" style="--h: \d+; --i: \d+', menu)) == 6
-    # komut paleti sayfa adini ilk .kenar-etiket'ten okur: ad, aciklamadan once gelir
-    assert re.search(r'menu-ad">Panel</span><small class="kenar-etiket menu-alt"', menu)
+    menu = html[html.index('id="ana-menu"'):html.index("</nav>", html.index('id="ana-menu"'))]
+    # kayan aktif hap ve aktif sayfa (Panel)
+    assert "data-aktif-gosterge" in menu
+    assert re.search(r'class="nav-hap" aria-current="page">\s*<span class="menu-ikon relative">', menu)
+    # Belgeler acilir paneli: alti kategori, her birinin sayaci; komut paleti adi .menu-ad'dan okur
+    assert 'data-acilir="belgeler"' in menu and 'id="acilir-belgeler"' in menu
+    assert len(re.findall(r'data-tur="[a-z_]+" style="--i: \d+"', menu)) == 6
+    assert menu.count("data-tur-sayaci=") == 6
+    assert 'menu-ad">Panel</span>' in menu
+    # eski kenar menu yok; mobil menude ayni baglantilar
+    assert 'id="kenar-menu"' not in html and "kenar-dar" not in html
+    mobil = html[html.index('id="mobil-menu"'):]
+    assert len(re.findall(r'data-tur="[a-z_]+"', mobil[:mobil.index("</nav>")])) == 6
 
 
-def test_kategori_agac_cizgisi_aktif_ture_gore(girisli):
+def test_belgeler_hapi_kategori_sayfasinda_aktif(girisli):
     c, _ = girisli
     kategori = c.get("/kategori/kimlik").get_data(as_text=True)
-    m = re.search(r'class="alt-liste" style="--n: (\d+); --dolgu: ([\d.]+); --h: (\d+)"', kategori)
-    assert m and m.group(1) == "6"
-    # kimlik listede ucuncu (indeks 2): (2 + .5) / (6 - .5)
-    assert abs(float(m.group(2)) - 2.5 / 5.5) < 1e-3
+    menu = kategori[kategori.index('id="ana-menu"'):]
+    assert re.search(r'data-acilir="belgeler"[^>]*data-aktif', menu)
+    assert re.search(r'data-tur="kimlik" style="--i: \d+"\s*aria-current="page"', menu)
     panel = _panel(c)
-    assert re.search(r'class="alt-liste" style="--n: 6; --dolgu: 0;', panel)
+    assert not re.search(r'data-acilir="belgeler"[^>]*data-aktif', panel)
 
 
 def test_morph_ve_tarama_isigi_kancalari(girisli):

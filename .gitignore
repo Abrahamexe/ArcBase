@@ -46,3 +46,9 @@ logs/
 
 # Bu bilgisayarda eklenen/kaldirilan izlenen klasorler (izlenen_klasorler.py)
 veri/
+
+# Playwright MCP ekran goruntuleri (gelistirme)
+.playwright-mcp/
+
+# Claude Code proje talimatlari (yerel)
+CLAUDE.md

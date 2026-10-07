@@ -3,15 +3,16 @@
 // bir sinif kullanildiginda yeniden derleyin (Node gerekmez, README "Gelistirme"):
 //   tailwindcss -c tailwind.config.js -i static/tailwind.giris.css -o static/tailwind.css --minify
 //
-// Tasarim: notr zemin, tek marka rengi (derin indigo), 1 px kenarlik ve cok
-// hafif golge, olculu kose yuvarlakligi (6-8 px), 8 px aralik sistemi.
+// Tasarim: Candy Blue zemin uzerinde beyaz, buyuk koseli kartlar (koyu temada
+// Onyx zemin, Cosmic kartlar); tek sicak vurgu (amber), cok yumusak ve zeminin
+// tonunu tasiyan golgeler, Plus Jakarta Sans. Renkler style.css degiskenlerinden.
 module.exports = {
   content: ['./templates/**/*.html', './static/app.js'],
   darkMode: 'class',
   theme: {
     extend: {
       fontFamily: {
-        sans: ['Inter', 'ui-sans-serif', 'system-ui', 'Segoe UI', 'sans-serif'],
+        sans: ['Plus Jakarta Sans', 'ui-sans-serif', 'system-ui', 'Segoe UI', 'sans-serif'],
       },
       // Yazi olcegi: kucuk 12 · gövde 14 · alt baslik 16 · baslik 20/24
       fontSize: {
@@ -24,25 +25,27 @@ module.exports = {
         '3xl': ['1.75rem', { lineHeight: '2.25rem', letterSpacing: '-0.02em' }],
         '4xl': ['2rem', { lineHeight: '2.5rem', letterSpacing: '-0.02em' }],
       },
-      // Kose yuvarlakligi: mevcut siniflar olculu degerlere esitlenir (6-8 px).
+      // Kose yuvarlakligi: referanstaki gibi yumusak; ic ogeler daha siki, kaplar daha genis.
       borderRadius: {
-        md: '6px',
-        lg: '6px',
-        xl: '8px',
-        '2xl': '8px',
-        '3xl': '10px',
+        md: '8px',
+        lg: '10px',
+        xl: '14px',
+        '2xl': '20px',
+        '3xl': '28px',
       },
       colors: {
-        // Derin indigo (marka). Butonlar 600, koyu temada 400-500.
-        marka: {
-          50: '#EEF0F9', 100: '#DDE1F3', 200: '#BCC3E6', 300: '#97A1D6', 400: '#717FC4',
-          500: '#5260AE', 600: '#3B4796', 700: '#2F397B', 800: '#252D61', 900: '#1C224A',
-        },
-        // Basari/onay yesili (tarihsel adiyla turkuaz); sicak vurgu gunes.
+        // Marka: celik mavi (Candy Blue ailesi); koyu temada lavanta. Ton olcegi her iki
+        // temada da ayni anlamdadir (50 acik ... 900 koyu), yalnizca renk tonu degisir.
+        marka: Object.fromEntries([50, 100, 200, 300, 400, 500, 600, 700, 800, 900]
+          .map((n) => [n, `rgb(var(--marka-${n}) / <alpha-value>)`])),
+        // Basari/onay yesili (tarihsel adiyla turkuaz); sicak vurgu gunes (amber #E8A33D).
         turkuaz: { 400: '#4FB892', 500: '#2F9E78', 600: '#237F60' },
-        gunes: { 50: '#FBF7EE', 100: '#F6EEDC', 400: '#D9A94A', 500: '#C18F2E', 600: '#9C7222' },
+        gunes: { 50: '#FDF6EA', 100: '#FAEACC', 400: '#F0B65A', 500: '#E8A33D', 600: '#B97A1C' },
         // Yuzey ve metin renkleri CSS degiskenlerinden gelir (style.css); boylece
         // koyu temada her sinifa ayrica dark: yazmak gerekmez.
+        // Tek vurgu rengi (amber) ve secili hap/birincil dugmenin murekkep rengi.
+        vurgu: 'rgb(var(--vurgu) / <alpha-value>)',
+        murekkep: 'rgb(var(--murekkep) / <alpha-value>)',
         zemin: 'rgb(var(--zemin) / <alpha-value>)',
         kart: 'rgb(var(--kart) / <alpha-value>)',
         yuzey: 'rgb(var(--yuzey) / <alpha-value>)',
@@ -54,8 +57,9 @@ module.exports = {
         },
       },
       boxShadow: {
-        kart: '0 1px 2px rgb(16 24 40 / 0.04)',
-        yukselt: '0 12px 32px -12px rgb(16 24 40 / 0.18), 0 2px 6px rgb(16 24 40 / 0.05)',
+        // Golgeler siyah degil, zeminin lacivert tonunu tasir; genis ve cok yumusak.
+        kart: '0 1px 2px rgb(var(--golge) / 0.05), 0 8px 24px -12px rgb(var(--golge) / 0.14)',
+        yukselt: '0 24px 60px -24px rgb(var(--golge) / 0.32), 0 4px 12px -4px rgb(var(--golge) / 0.08)',
       },
     },
   },

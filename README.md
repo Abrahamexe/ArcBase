@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="static/logo.svg" width="96" height="96" alt="ArcBase logosu: altın tutamaklı arşiv dolabı">
+</p>
+
 # ArcBase
 
 **Dijital arşiv ve belge sınıflandırma sistemi**
@@ -20,7 +24,7 @@ bağlı tarayıcıdan alınıp arşivlenir. Bkz. [Yerel mod](#yerel-mod-kurum-ku
 > **Canlı site:** _yayına alındıktan sonra buraya eklenecek_ (Render ücretsiz katmanında çalışır; site
 > bir süre boşta kalınca uykuya geçer, ilk açılış 30-60 saniye sürebilir.)
 
-![ArcBase paneli: karşılama, özet kartları, tarayıcı durumu ve hızlı yükleme](docs/screenshots/panel.png)
+![ArcBase paneli: üst hap menü, depolama kadranı ve belge yığını, kategori dağılımı, haftalık yükleme, tarayıcı durumu ve hızlı yükleme](docs/screenshots/panel.png)
 
 ## Özellikler
 
@@ -64,7 +68,7 @@ bağlı tarayıcıdan alınıp arşivlenir. Bkz. [Yerel mod](#yerel-mod-kurum-ku
 - **Depolama tasarrufu:** Görseller en fazla 2000 px'e küçültülüp JPEG olarak saklanır (EXIF temizlenir);
   OCR tam çözünürlüklü dosyadan yapılır
 - **Güvenlik:** Şifreler hash'lenir, tüm formlarda CSRF koruması, giriş denemelerine hız sınırı
-- **Arayüz:** Açık/koyu tema, mobil uyumlu, animasyonlu modern tasarım
+- **Arayüz:** Candy Blue / Cosmic temalı açık ve koyu tema, üstte hap menü (aktif sayfa kayarak geçer), Panel'de depolama kadranı, kategori grafiği ve tarayıcı radarı, Ctrl K komut paleti, mobil uyumlu, sakin animasyonlar ([Tasarım](#tasarım))
 
 ## Ekran görüntüleri
 
@@ -83,12 +87,31 @@ bağlı tarayıcıdan alınıp arşivlenir. Bkz. [Yerel mod](#yerel-mod-kurum-ku
 <p align="center">
   <img src="docs/screenshots/mobil-giris.png" width="240" alt="Mobil giriş">
   <img src="docs/screenshots/mobil-panel.png" width="240" alt="Mobil panel">
-  <img src="docs/screenshots/mobil-menu.png" width="240" alt="Mobil menü: Arşiv ve Yönetim grupları">
+  <img src="docs/screenshots/mobil-menu.png" width="240" alt="Mobil menü: kategoriler ve tarama bağlantıları">
 </p>
 
 > Ekran görüntülerindeki belgeler, firmalar ve kullanıcı ("demo") tamamen sentetiktir; gerçek kişi ya da kurum
 > bilgisi yoktur. `python scripts/ekran_goruntusu.py` bunları, yalnızca `TEST_DATABASE_URL`'deki test
 > veritabanında ve geçici bir sunucu portunda, sentetik belgelerle yeniden üretir (Playwright + Chromium).
+
+## Tasarım
+
+| | Açık tema | Koyu tema |
+|---|---|---|
+| Zemin | Candy Blue `#B2D5E5` | Onyx `#020202` |
+| Uygulama kabuğu / kart | `#EEF5F9` / beyaz | `#100F15` / Cosmic `#23212C` |
+| Arayüz rengi (menü, düğme, odak) | Derin çelik mavi `#2C4F63` | Açık `#E7E5EE`, lavanta `#9C93C9` |
+| Veri vurgusu (kadran, grafik) | Amber `#E8A33D` | Amber `#F0B65A` |
+
+- **Düzen:** Uygulama renkli zeminin üzerinde yüzen, büyük köşeli tek bir kabuktur; üst çubuk, içerik ve alt
+  bilgi aynı kapta ve aynı akışkan kenar boşluğundadır. Panel 12 sütunlu bir bento ızgarasıdır.
+- **Yazı:** Plus Jakarta Sans (yerel dosya, OFL); büyük sayılar ince (300), başlıklar sade.
+- **Renk kuralı:** Arayüz parçaları çelik mavi ailesinde kalır; amber yalnızca veride ve uyarılarda kullanılır.
+- **Hareket:** Girişler bir kez ve 300–800 ms; sürekli hareket yalnızca çok yavaş olanlarda (belge yığını,
+  bağlı tarayıcının radarı, işlenen belgedeki tarama ışığı). "Hareketi azalt" açıksa hepsi durur.
+- **Logo** (`static/logo.svg`): altın tutamaklı arşiv dolabı. Ölçüler altın orana göredir (φ ≈ 1,618,
+  Fibonacci 8-13-21-55-89): kap 89, köşe 21, iç alan 55 (89/φ), çekmece 13 ve aralık 8 (13/8 ≈ φ),
+  tutamak 21 (55/φ²).
 
 ## Kullanılan teknolojiler
 
@@ -629,7 +652,7 @@ değilse atlanır.
 | `test_tarayici_wia_gercek.py` | **İsteğe bağlı, gerçek tarayıcı (yalnızca Windows):** gerçek WIA ile algılama ve tarama (`TARAYICI_GERCEK_TARA=1` ile camdaki kâğıdı tarar) |
 | `test_yerel_veri.py` | Veri taşıma (`scripts/veri_tasi.py`), yedekleme (`scripts/yedekle.py`) ve testlerin canlı veritabanına bağlanmama koruması |
 | `test_anahtar_yenile.py` | `ENCRYPTION_KEY` yenileme (`scripts/anahtar_yenile.py`): dry-run, uygulama, doğrulama, hatalı eski anahtar, geri alma, yedek denetimi |
-| `test_etkiler.py` | Arayüz etkilerinin şablonlardaki yeri (her etki tek yerde) |
+| `test_etkiler.py` | Arayüz yapısı (üst hap menü, Panel ızgarası) ve görsel etkilerin şablonlardaki yeri (her etki tek yerde) |
 | `test_kimlik.py`, `test_belgeler.py` | Hesaplar, oturum, yükleme, OCR, sıkıştırma, PDF, kota |
 
 ## Yayına alma (Render + Docker)
@@ -724,7 +747,7 @@ kurulumu: **[docs/KURULUM_KURUM.md](docs/KURULUM_KURUM.md)**.
 - **Çerezler**: yerel ağda HTTP kullanıldığı için yerel modda `Secure` çerez yalnızca `HTTPS=1` iken açıktır
   (aksi halde tarayıcı çerezi göndermez, giriş yapılamaz). Render'da (`URETIM=1`) her zaman açıktır. Yerel
   modda `X-Forwarded-For` başlığına güvenilmez (hız sınırı atlatılamaz).
-- **Dış kaynak yok**: yazı tipi (Inter, `static/fonts/`), ikonlar ve JavaScript uygulamayla
+- **Dış kaynak yok**: yazı tipi (Plus Jakarta Sans, `static/fonts/`), ikonlar ve JavaScript uygulamayla
   gelir; sayfalar hiçbir dış adrese (CDN, Google Fonts) istek atmaz. Bunu bir test doğrular.
 - **Yönetici ve Gelen belgeler**: `YONETICI_KULLANICI` ya da (boşsa) ilk kaydolan kullanıcı yöneticidir.
   Tarama klasörüne sahipsiz düşen belgeler yöneticinin **Gelen belgeler** kutusuna (`/gelen`) gider; yönetici
@@ -788,7 +811,7 @@ PDF/Word/Excel üretimi sunucuda yapılır. Arayüz dış kaynak yüklemez. Bulu
 | `excel.py` | `.xlsx` üretimi (openpyxl) |
 | `crypto.py` | Fernet ile şifreleme / çözme |
 | `templates/` | Açılış, giriş, kayıt, panel, kategori, belge, arama, hesap, Gelen belgeler, tarama, tarama klasörleri, tarama durumu ve hata sayfaları; ortak parçalar (`base.html`, `_bilesenler.html`) |
-| `static/` | `app.js` (arayüz davranışları, işleme durumu yoklaması), `style.css` (tema ve animasyonlar), `tailwind.css` (derlenmiş Tailwind), `tailwind.giris.css` (derleme girdisi), `etkiler.css` / `etkiler.js` (görsel etkiler) |
+| `static/` | `app.js` (arayüz davranışları, işleme durumu yoklaması), `style.css` (tema ve animasyonlar), `tailwind.css` (derlenmiş Tailwind), `tailwind.giris.css` (derleme girdisi), `etkiler.css` / `etkiler.js` (Panel düzeni ve görsel etkiler), `logo.svg` (logo) |
 | `tailwind.config.js` | Tailwind derleme ayarları (renkler, font, taranan dosyalar) |
 | `tests/` | pytest testleri; `ornek_gorseller.py` sentetik fotoğraflar üretir (masa, perspektif, sarı ışık, gölge, mühür) |
 | `docs/once_sonra.py` | Kendi fotoğraflarınızdan README için tarama öncesi/sonrası görseli üretir |
@@ -806,7 +829,7 @@ PDF/Word/Excel üretimi sunucuda yapılır. Arayüz dış kaynak yüklemez. Bulu
 | `tarama_gunlugu.py` | Son aktarılan dosyalar ve son tarama hataları (yöneticinin durum sayfası) |
 | `scripts/veri_tasi.py` · `scripts/yedekle.py` | Neon → yerel veri taşıma (doğrulamalı) · `pg_dump` ile tarihli yedek |
 | `docs/KURULUM_KURUM.md` | Kurum için adım adım Windows kurulum rehberi |
-| `static/fonts/`, `static/fonts.css` | Yerel yazı tipi (Inter, OFL) |
+| `static/fonts/`, `static/fonts.css` | Yerel yazı tipi (Plus Jakarta Sans, OFL) |
 
 ## Route'lar
 
@@ -858,7 +881,7 @@ Telif hakkı © 2026 İbrahim Hakkı Evin.
 bir ağ hizmeti olarak kullanıcılara sunarsanız**, kaynak kodunu da aynı lisansla bu kullanıcılara açmanız
 gerekir. PDF işleme için kullanılan PyMuPDF de AGPL-3.0 lisanslıdır. Diğer Python bağımlılıklarının
 lisansları (MIT, MIT-CMU/HPND, BSD, Apache-2.0, LGPL-3.0, PSF-2.0, 0BSD, Zlib, CC0) ve arayüzde kullanılanlar
-(Tailwind CSS — MIT, derlenmiş CSS'teki lisans notu korunur; Lucide ikonları — ISC; Inter yazı
+(Tailwind CSS — MIT, derlenmiş CSS'teki lisans notu korunur; Lucide ikonları — ISC; Plus Jakarta Sans yazı
 tipi — OFL-1.1, `static/fonts/` içinde lisansıyla birlikte gelir) AGPL-3.0 ile uyumludur. Yerel mod
 paketleri: waitress (ZPL-2.1), watchdog (Apache-2.0), pywin32 (PSF-2.0).
 

@@ -535,8 +535,7 @@ def cek_hepsi(tarayici, cekim, uygulama_modulu, database, isleme, demo_id, ids):
     s = cekim.sayfa_ac(b, izleme)
 
     def menuyu_ac(sayfa):
-        for grup in ("arsiv", "yonetim"):
-            sayfa.click(f"[data-grup-dugmesi={grup}]")
+        """Ust hap menude acik grup yoktur; mobil menu tum baglantilari zaten gosterir."""
         sayfa.wait_for_timeout(600)
 
     if adim("panel"):
@@ -663,7 +662,7 @@ def toplu_yukleme(tarayici, cekim, baglam, oturum, isleme, database, demo_id, iz
             timeout=60000)
         s.wait_for_timeout(1500)
         cekim.hazirla(s)
-        cekim.cek_oge(s, "toplu-yukleme", ".kenar-isini")
+        cekim.cek_oge(s, "toplu-yukleme", ".yukleme-karti")
     finally:
         engel.set()  # bırak: her şey bitsin (temizlik için)
         deadline = time.time() + 90
