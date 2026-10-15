@@ -6,7 +6,7 @@
 
 **Dijital arşiv ve belge sınıflandırma sistemi**
 
-Sürüm 1.1.0 · AGPL-3.0 lisanslı
+Sürüm 1.1.0 · Tüm hakları saklıdır (kaynak yalnızca inceleme için açık)
 
 Telefonla çekilmiş yamuk, gölgeli bir belge fotoğrafını **tarayıcıdan çıkmış gibi görünen bir belgeye**
 dönüştüren ve **aranabilir A4 PDF** olarak veren bir "tarayıcı + arşiv" uygulaması. Fotoğraf **OpenCV** ile
@@ -874,19 +874,18 @@ Belge route'larının tamamı giriş gerektirir; başka kullanıcının belgesi 
 
 ## Lisans
 
-Bu proje [GNU Affero Genel Kamu Lisansı v3.0](LICENSE) (AGPL-3.0) ile lisanslanmıştır.
-Telif hakkı © 2026 İbrahim Hakkı Evin.
+**Tüm hakları saklıdır.** Telif hakkı © 2026 İbrahim Hakkı Evin. Ayrıntılar: [LICENSE](LICENSE).
 
-Özetle: kodu kullanabilir, değiştirebilir ve dağıtabilirsiniz; değiştirilmiş bir sürümü dağıtırsanız **ya da
-bir ağ hizmeti olarak kullanıcılara sunarsanız**, kaynak kodunu da aynı lisansla bu kullanıcılara açmanız
-gerekir. PDF işleme için kullanılan PyMuPDF de AGPL-3.0 lisanslıdır. Diğer Python bağımlılıklarının
-lisansları (MIT, MIT-CMU/HPND, BSD, Apache-2.0, LGPL-3.0, PSF-2.0, 0BSD, Zlib, CC0) ve arayüzde kullanılanlar
-(Tailwind CSS — MIT, derlenmiş CSS'teki lisans notu korunur; Lucide ikonları — ISC; Plus Jakarta Sans yazı
-tipi — OFL-1.1, `static/fonts/` içinde lisansıyla birlikte gelir) AGPL-3.0 ile uyumludur. Yerel mod
-paketleri: waitress (ZPL-2.1), watchdog (Apache-2.0), pywin32 (PSF-2.0).
+Kaynak kodu yalnızca **incelenmesi için** herkese açıktır; açık kaynak lisansı **değildir**. Kod, tasarımlar,
+arayüz, logo, görseller ve "ArcBase" adı İbrahim Hakkı Evin'e aittir. Yazılı izin olmadan kullanılamaz,
+çalıştırılamaz, kopyalanamaz, değiştirilemez, dağıtılamaz ve başka bir çalışmada taklit edilemez.
+
+Depodaki üçüncü taraf bileşenler kendi lisanslarıyla gelir: Plus Jakarta Sans yazı tipi (OFL-1.1,
+`static/fonts/`), Lucide ikonları (ISC), Tailwind CSS ile derlenmiş stiller (MIT). Kullanılan Python
+paketleri depoya dahil değildir ve her biri kendi lisansına tabidir.
 
 ## Geliştirici
 
 - **Geliştirici:** İbrahim Hakkı Evin
 - **GitHub:** https://github.com/Abrahamexe
-- **Lisans:** AGPL-3.0, ayrıntılar yukarıdaki [Lisans](#lisans) bölümünde ([LICENSE](LICENSE)).
+- **Lisans:** Tüm hakları saklıdır, ayrıntılar yukarıdaki [Lisans](#lisans) bölümünde ([LICENSE](LICENSE)).
