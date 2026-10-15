@@ -867,14 +867,6 @@ def sonraki_is_suresi(kullanici_id=None):
     return max(float(satir["kalan"]), 0.0)
 
 
-def is_kalp_atisi(belge_id):
-    """Uzun suren isin sahipsiz sanilip baska surece verilmesini onler."""
-    _sorgula(
-        f"UPDATE belgeler SET isleme_zamani = {_SIMDI} WHERE id = %s AND isleme_durumu = '{ISLENIYOR}'",
-        (belge_id,),
-    )
-
-
 def goruntu_asamasini_kaydet(belge_id, bilgi, ocr_metni, sifreli_onizleme, koseler=None,
                              otomatik_duzeltildi=False):
     """Goruntu asamasinin sonucu: OCR metni, koseler ve duzeltilmis onizleme

@@ -56,8 +56,3 @@ def coz(sifreli_veri):
         raise SifrelemeHatasi(
             "Belge çözülemedi. ENCRYPTION_KEY değişmiş olabilir."
         ) from hata
-
-
-def anahtar_uret():
-    """Yeni bir Fernet anahtari uretir (kurulumda bir kez kullanilir)."""
-    return Fernet.generate_key().decode()

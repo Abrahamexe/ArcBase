@@ -3,6 +3,7 @@
 import io
 import json
 import os
+import secrets
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
@@ -111,8 +112,11 @@ HTTPS = os.getenv("HTTPS") == "1"
 GUVENLI_CEREZ = HTTPS if YEREL_MOD else (URETIM or HTTPS)
 
 app = Flask(__name__)
+# Gelistirmede SECRET_KEY yoksa her surece rastgele bir anahtar uretilir
+# (oturumlar yeniden baslatmada kapanir). Sabit bir anahtar herkese acik
+# depoda bilinir ve oturum cerezi taklit edilebilirdi.
 app.config["SECRET_KEY"] = os.getenv("SECRET_KEY") or (
-    None if URETIM or YEREL_MOD else "gelistirme-anahtari"
+    None if URETIM or YEREL_MOD else secrets.token_hex(32)
 )
 if not app.config["SECRET_KEY"]:
     raise RuntimeError("SECRET_KEY tanımlı değil; üretimde ve yerel modda zorunludur.")
@@ -205,6 +209,9 @@ def _statik_surum(endpoint, degerler):
 def _statik_onbellek(yanit):
     if request.endpoint == "static" and request.args.get("v") and yanit.status_code == 200:
         yanit.headers["Cache-Control"] = "public, max-age=31536000, immutable"
+    # Tarayici icerik turunu tahmin etmesin; sayfalar baska sitelerde cercevelenemesin.
+    yanit.headers.setdefault("X-Content-Type-Options", "nosniff")
+    yanit.headers.setdefault("X-Frame-Options", "SAMEORIGIN")
     return yanit
 
 
@@ -813,8 +820,9 @@ def tarama_durumu():
 
 def _yerel_istek_mi():
     """Istek ArcBase'in calistigi bilgisayarin kendisinden mi (127.0.0.1 / ::1)?
-    Vekil sunucu arkasinda (Render) hicbir istek yerel sayilmaz."""
-    if URETIM and not YEREL_MOD:
+    Vekil sunucu arkasinda (Render ya da HTTPS=1 ile ondeki TLS sunucusu)
+    hicbir istek yerel sayilmaz: orada her istek 127.0.0.1'den geliyor gorunur."""
+    if (URETIM and not YEREL_MOD) or HTTPS:
         return False
     return request.remote_addr in ("127.0.0.1", "::1")
 
@@ -1470,4 +1478,4 @@ def indir(belge_id):
 if __name__ == "__main__":
     # Sadece gelistirme icin; yayinda gunicorn (Dockerfile), Windows'ta
     # waitress (sunucu.py, baslat.bat) kullanilir.
-      app.run(debug=True, port=5001)
+    app.run(debug=True, port=5001)

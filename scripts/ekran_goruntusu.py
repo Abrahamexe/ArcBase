@@ -20,7 +20,6 @@ yonetici-tarama-durumu. "tarama-once-sonra-sentetik.jpg" docs/once_sonra.py ile 
 """
 
 import argparse
-import io
 import os
 import re
 import shutil
@@ -56,7 +55,6 @@ except db_korumasi.CanliVeritabaniHatasi as hata:
 if not TEST_VERITABANI:
     sys.exit("TEST_DATABASE_URL tanımlı değil: canlı veritabanı kullanılmayacağı için işlem durduruldu.")
 
-import cv2  # noqa: E402
 import numpy as np  # noqa: E402
 from PIL import Image, ImageDraw, ImageFont  # noqa: E402
 
