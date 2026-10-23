@@ -12,7 +12,7 @@ watchdog==6.0.0
 # Bagli tarayicidan dogrudan tarama (tarayici_wia.py, TARAYICI_WIA=1); yalnizca Windows
 pywin32==312 ; sys_platform == "win32"
 pytesseract==0.3.13
-pillow==12.3.0
+pillow==13.0.0
 pymupdf==1.28.2
 openai==3.17.0
 python-dotenv==1.2.3
